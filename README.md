@@ -1,7 +1,7 @@
-# UNI-LINK
+# Redis-view
 
 #### 介绍
-一款用于 MySQL 和 Redis 的客户端工具
+一款用于 Redis 的客户端工具
 
 #### 软件架构
 软件架构说明
