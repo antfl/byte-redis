@@ -26,17 +26,14 @@
 pnpm install
 
 # 启动开发服务器
-pnpm dev
+pnpm tauri dev
 ```
 
 ## 构建应用
 
 ```bash
-# 构建生产环境版本
-pnpm build
-
 # 构建并打包桌面应用
-pnpm build:tauri
+pnpm tauri build
 ```
 
 ## 项目结构
