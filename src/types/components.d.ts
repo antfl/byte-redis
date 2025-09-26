@@ -33,5 +33,12 @@ declare module 'vue' {
     ATabs: typeof import('ant-design-vue/es')['Tabs']
     ATag: typeof import('ant-design-vue/es')['Tag']
     ATextarea: typeof import('ant-design-vue/es')['Textarea']
+    DatabaseOutlined: typeof import('@ant-design/icons-vue')['DatabaseOutlined']
+    DeleteOutlined: typeof import('@ant-design/icons-vue')['DeleteOutlined']
+    EditOutlined: typeof import('@ant-design/icons-vue')['EditOutlined']
+    EyeOutlined: typeof import('@ant-design/icons-vue')['EyeOutlined']
+    KeyOutlined: typeof import('@ant-design/icons-vue')['KeyOutlined']
+    PlusOutlined: typeof import('@ant-design/icons-vue')['PlusOutlined']
+    ReloadOutlined: typeof import('@ant-design/icons-vue')['ReloadOutlined']
   }
 }
