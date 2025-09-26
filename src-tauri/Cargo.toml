@@ -1,16 +1,16 @@
 [package]
 name = "redis-view"
 version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
+description = "一款用于 Redis 的客户端工具"
+authors = ["https://github.com/antfl"]
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+# 更多配置参考：https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]
-# The `_lib` suffix may seem redundant but it is necessary
-# to make the lib name unique and wouldn't conflict with the bin name.
-# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+# `_lib` 后缀看似多余，但它是必要的
+# 目的是确保库名称唯一，避免与二进制文件名冲突
+# 这似乎是仅存在于 Windows 系统的问题，详见：https://github.com/rust-lang/cargo/issues/8519
 name = "redis_view_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
@@ -22,4 +22,8 @@ tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+redis = "0.24.0"
+tokio = { version = "1.0", features = ["full"] }
+tauri-plugin-store = "2"
+
 
