@@ -1,0 +1,40 @@
+html,
+body,
+section,
+div,
+ul,
+ol,
+li,
+a,
+p,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  margin: 0;
+  box-sizing: border-box;
+}
+
+li {
+  list-style: none;
+}
+
+.split-line {
+  padding-left: 10px;
+  position: relative;
+
+  &::before {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    display: block;
+    width: 3px;
+    height: 1em;
+    content: '';
+    background-color: #1677ff;
+    border-radius: 3px;
+    transform: translateY(-50%);
+  }
+}

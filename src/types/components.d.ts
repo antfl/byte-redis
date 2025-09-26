@@ -9,7 +9,9 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     AButton: typeof import('ant-design-vue/es')['Button']
+    ACard: typeof import('ant-design-vue/es')['Card']
     ACol: typeof import('ant-design-vue/es')['Col']
+    AConfigProvider: typeof import('ant-design-vue/es')['ConfigProvider']
     AForm: typeof import('ant-design-vue/es')['Form']
     AFormItem: typeof import('ant-design-vue/es')['FormItem']
     AInput: typeof import('ant-design-vue/es')['Input']
@@ -37,6 +39,7 @@ declare module 'vue' {
     DeleteOutlined: typeof import('@ant-design/icons-vue')['DeleteOutlined']
     EditOutlined: typeof import('@ant-design/icons-vue')['EditOutlined']
     EyeOutlined: typeof import('@ant-design/icons-vue')['EyeOutlined']
+    InfoCircleOutlined: typeof import('@ant-design/icons-vue')['InfoCircleOutlined']
     KeyOutlined: typeof import('@ant-design/icons-vue')['KeyOutlined']
     PlusOutlined: typeof import('@ant-design/icons-vue')['PlusOutlined']
     ReloadOutlined: typeof import('@ant-design/icons-vue')['ReloadOutlined']
