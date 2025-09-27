@@ -27,6 +27,7 @@ declare module 'vue' {
     AListItem: typeof import("ant-design-vue/es")["ListItem"]
     AListItemMeta: typeof import("ant-design-vue/es")["ListItemMeta"]
     AModal: typeof import('ant-design-vue/es')['Modal']
+    APopconfirm: typeof import('ant-design-vue/es')['Popconfirm']
     App: typeof import("./../App.vue")["default"]
     ARow: typeof import('ant-design-vue/es')['Row']
     ASelect: typeof import('ant-design-vue/es')['Select']
