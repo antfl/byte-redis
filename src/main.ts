@@ -1,9 +1,9 @@
-import {createApp} from "vue";
+import { createApp } from "vue";
 import App from "./App.vue";
 
-import 'virtual:uno.css';
-import '@/assets/style/common.less';
+import "virtual:uno.css";
+import "@/assets/style/common.less";
 
-const app = createApp(App)
+const app = createApp(App);
 
 app.mount("#app");
