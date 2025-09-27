@@ -1,5 +1,5 @@
 [package]
-name = "redis-view"
+name = "ByteRedis"
 version = "0.1.0"
 description = "一款用于 Redis 的客户端工具"
 authors = ["https://github.com/antfl"]

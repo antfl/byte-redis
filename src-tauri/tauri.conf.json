@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "redis-view",
+  "productName": "ByteRedis",
   "version": "0.1.0",
-  "identifier": "com.redis-view.app",
+  "identifier": "cn.byteout.ByteRedis",
   "build": {
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "redis-view",
+        "title": "ByteRedis",
         "width": 800,
         "height": 600
       }
