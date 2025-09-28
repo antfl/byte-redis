@@ -99,22 +99,20 @@ defineExpose({ load });
 </script>
 
 <template>
-  <a-card class="my-10px">
+  <a-card  size="small" :bordered="false">
     <div class="split-line mb-16px">数据库</div>
-    <a-select class="w-100%" @change="selectDb">
+    <a-select class="w-100%" placeholder="请选择数据库" @change="selectDb">
       <a-select-option
         v-for="(item, index) in databases"
         :value="item.index"
         :key="index"
       >
-        <a-tag
-          class="w-80%"
-          :bordered="false"
-          :color="currentDb === item.index ? 'blue' : ''"
-        >
-          <span>DB {{ item.index }}</span>
-          key: {{ item.keyCount }}
+        <a-tag class="w-65px" color="processing" :bordered="false">
+          <DatabaseOutlined /> DB {{ item.index + 1 }}
         </a-tag>
+        <span :class="`${currentDb === item.index ? 'color-blue' : 'color-#1e1f22'}`">
+          {{ item.keyCount }}
+        </span>
       </a-select-option>
     </a-select>
   </a-card>

@@ -1,9 +1,15 @@
 <template>
   <div data-tauri-drag-region class="title-bar">
-    <div class="app-info">
-      <img class="app-logo" :src="Logo" :alt="appName">
-      <div class="app-name">{{ appName }}</div>
-    </div>
+   <div class="flex items-center">
+     <div class="app-info">
+       <img class="app-logo" :src="Logo" :alt="appName">
+       <div class="app-name">{{ appName }}</div>
+     </div>
+     <div class="info-content">
+       <span class="mr-12px">-</span>
+       <span class="color-#1677ff font-600">127.0.0.1</span>
+     </div>
+   </div>
 
     <div class="window-controls">
       <div class="control-btn" @click="minimize" title="最小化">
@@ -29,7 +35,7 @@ import {
 } from "@ant-design/icons-vue";
 import Logo from "@/assets/images/logo.jpg";
 
-const appName = import.meta.env.VITE_APP_NAME || "ByteRedis";
+const appName = import.meta.env.VITE_APP_NAME || "Byte Redis";
 
 const appWindow = new Window("main");
 
@@ -64,8 +70,8 @@ const close = () => {
 
 <style scoped>
 .title-bar {
-  height: 40px;
-  background: #fff;
+  height: var(--title-bar-height);
+  background-color: #fff;
   user-select: none;
   display: flex;
   justify-content: space-between;
@@ -75,13 +81,21 @@ const close = () => {
   left: 0;
   right: 0;
   z-index: 1000;
+  overflow: hidden;
+  border-bottom: 1px solid #f0f0f0;
 }
 
 .app-info {
-  margin-left: 12px;
+  margin: 0 12px;
   display: flex;
   align-items: center;
   gap: 10px;
+  overflow: hidden;
+  filter: drop-shadow(0 0 1em #1b7bff);
+}
+
+.info-content {
+  filter: drop-shadow(0 0 1em #1b7bff);
 }
 
 .app-logo {

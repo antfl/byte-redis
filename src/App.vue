@@ -4,7 +4,8 @@ import Layout from "@/layout/Layout.vue";
 
 const themeConfig = {
 	token: {
-		borderRadius: 1,
+		borderRadius: 3,
+
 	},
 };
 </script>

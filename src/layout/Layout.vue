@@ -2,7 +2,7 @@
 import ConnectionManager from "@/layout/components/ConnectionManager/index.vue";
 import DatabaseList from "@/layout/components/DatabaseList/index.vue";
 import ServerInfo from "@/layout/components/ServerInfo/index.vue";
-import RedisDataTable from "@/layout/components/RedisDataTable/index.vue";
+import RedisData from "@/layout/components/RedisData/index.vue";
 import TitleBar from "@/components/TitleBar/index.vue";
 
 // 创建存储实例
@@ -72,12 +72,12 @@ async function loadDatabaseInfo() {
 }
 
 /** Redis 数据相关 */
-const RedisDataTableRef = ref();
+const RedisDataRef = ref();
 
 async function loadKeys() {
 	if (!activeConnectionId.value || !isConnected(activeConnectionId.value))
 		return;
-	RedisDataTableRef.value.load({
+	RedisDataRef.value.load({
 		_activeConnections: activeConnections.value,
 		_activeConnectionId: activeConnectionId.value,
 	});
@@ -102,7 +102,7 @@ async function loadKeys() {
       </a-layout-sider>
       <a-layout-content>
         <!-- Redis 数据 -->
-        <RedisDataTable ref="RedisDataTableRef"/>
+        <RedisData ref="RedisDataRef"/>
       </a-layout-content>
     </a-layout>
   </a-layout>
