@@ -3,6 +3,7 @@ import ConnectionManager from "@/layout/components/ConnectionManager/index.vue";
 import DatabaseList from "@/layout/components/DatabaseList/index.vue";
 import ServerInfo from "@/layout/components/ServerInfo/index.vue";
 import RedisDataTable from "@/layout/components/RedisDataTable/index.vue";
+import TitleBar from "@/components/TitleBar/index.vue";
 
 // 创建存储实例
 import { store } from "@/utils/storage.ts";
@@ -62,6 +63,7 @@ const loadServerInfo = () => {
 
 /** 数据库相关 */
 const DatabaseListRef = ref();
+
 async function loadDatabaseInfo() {
 	DatabaseListRef.value.load({
 		_activeConnections: activeConnections.value,
@@ -71,6 +73,7 @@ async function loadDatabaseInfo() {
 
 /** Redis 数据相关 */
 const RedisDataTableRef = ref();
+
 async function loadKeys() {
 	if (!activeConnectionId.value || !isConnected(activeConnectionId.value))
 		return;
@@ -83,19 +86,24 @@ async function loadKeys() {
 
 <template>
   <a-layout>
-    <a-layout-sider theme="light" width="280">
-      <!-- 连接管理 -->
-      <ConnectionManager @on-success="connectSuccess"/>
+    <a-layout-header :style="{ height: '40px' }">
+      <TitleBar/>
+    </a-layout-header>
+    <a-layout>
+      <a-layout-sider theme="light" width="280">
+        <!-- 连接管理 -->
+        <ConnectionManager @on-success="connectSuccess"/>
 
-      <!-- 数据库 -->
-      <DatabaseList ref="DatabaseListRef" @on-success="loadKeys"/>
+        <!-- 数据库 -->
+        <DatabaseList ref="DatabaseListRef" @on-success="loadKeys"/>
 
-      <!-- 服务器信息 -->
-      <ServerInfo ref="ServerInfoRef"/>
-    </a-layout-sider>
-    <a-layout-content>
-      <!-- Redis 数据 -->
-      <RedisDataTable ref="RedisDataTableRef"/>
-    </a-layout-content>
+        <!-- 服务器信息 -->
+        <ServerInfo ref="ServerInfoRef"/>
+      </a-layout-sider>
+      <a-layout-content>
+        <!-- Redis 数据 -->
+        <RedisDataTable ref="RedisDataTableRef"/>
+      </a-layout-content>
+    </a-layout>
   </a-layout>
 </template>

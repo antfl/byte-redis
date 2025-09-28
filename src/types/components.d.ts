@@ -22,6 +22,7 @@ declare module 'vue' {
     AInputSearch: typeof import('ant-design-vue/es')['InputSearch']
     ALayout: typeof import('ant-design-vue/es')['Layout']
     ALayoutContent: typeof import('ant-design-vue/es')['LayoutContent']
+    ALayoutHeader: typeof import('ant-design-vue/es')['LayoutHeader']
     ALayoutSider: typeof import('ant-design-vue/es')['LayoutSider']
     AList: typeof import("ant-design-vue/es")["List"]
     AListItem: typeof import("ant-design-vue/es")["ListItem"]
@@ -39,6 +40,7 @@ declare module 'vue' {
     ATag: typeof import('ant-design-vue/es')['Tag']
     ATextarea: typeof import('ant-design-vue/es')['Textarea']
     ATooltip: typeof import('ant-design-vue/es')['Tooltip']
+    CloseOutlined: typeof import("@ant-design/icons-vue")["CloseOutlined"]
     ConnectionManager: typeof import("@/layout/components/ConnectionManager/index.vue")["default"]
     ConnectionModal: typeof import("@/layout/components/ConnectionModal/index.vue")["default"]
     DatabaseList: typeof import("@/layout/components/DatabaseList/index.vue")["default"]
@@ -47,9 +49,12 @@ declare module 'vue' {
     EditOutlined: typeof import('@ant-design/icons-vue')['EditOutlined']
     EyeOutlined: typeof import('@ant-design/icons-vue')['EyeOutlined']
     Layout: typeof import("./../layout/Layout.vue")["default"]
+    MinusOutlined: typeof import("@ant-design/icons-vue")["MinusOutlined"]
     PlusOutlined: typeof import('@ant-design/icons-vue')['PlusOutlined']
     ReloadOutlined: typeof import('@ant-design/icons-vue')['ReloadOutlined']
     ServerInfo: typeof import("@/layout/components/ServerInfo/index.vue")["default"]
+    StatusBar: typeof import("./../components/StatusBar/index.vue")["default"]
+    TitleBar: typeof import('./../components/TitleBar/index.vue')['default']
     ViewKeyModal: typeof import("@/layout/components/ViewKeyModal/index.vue")["default"]
   }
 }
