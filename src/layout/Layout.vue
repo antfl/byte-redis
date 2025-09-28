@@ -86,10 +86,10 @@ async function loadKeys() {
 
 <template>
   <a-layout>
-    <a-layout-header :style="{ height: '40px' }">
+    <a-layout-header class="h-[var(--title-bar-height)]!">
       <TitleBar/>
     </a-layout-header>
-    <a-layout>
+    <a-layout class="h-[calc(100vh_-_var(--title-bar-height))] overflow-hidden">
       <a-layout-sider theme="light" width="280">
         <!-- 连接管理 -->
         <ConnectionManager @on-success="connectSuccess"/>
