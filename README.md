@@ -1,4 +1,4 @@
-# Redis View
+# Byte Redis
 
 基于 Tauri + Vue + TypeScript 的 Redis 可视化管理工具。
 
