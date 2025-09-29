@@ -2,6 +2,8 @@
 
 基于 Tauri + Vue + TypeScript 的 Redis 可视化管理工具。
 
+![preview.png](docs/preview.png)
+
 ## 特性
 
 - 基于 Vue 3 Composition API + TypeScript
