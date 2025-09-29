@@ -1,0 +1,49 @@
+.byte-modal.ant-modal {
+  .ant-modal-content {
+    padding: 0;
+  }
+
+  .ant-modal-close {
+    top: 13px;
+  }
+
+  .ant-modal-header {
+    padding: 10px 20px;
+    margin-bottom: 0;
+    border-bottom: 1px solid #ededed;
+
+    .ant-modal-title {
+      font-weight: 400;
+    }
+  }
+
+  .ant-modal-body {
+    padding: 15px;
+  }
+}
+
+.ant-card {
+  box-shadow: none !important;
+}
+
+.ant-modal-wrap {
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+    background: transparent;
+  }
+
+  -ms-overflow-style: none;
+  overflow: auto;
+  .ant-modal-body {
+    overflow: auto;
+    max-height: 75vh;
+  }
+
+  .ant-modal-content {
+    border: 1px solid #d9d9d9;
+  }
+}

@@ -142,6 +142,7 @@ defineExpose({
     :title="'键详情: ' + currentKey"
     width="800px"
     class="byte-modal"
+    :centered="true"
     :footer="null"
   >
     <a-tabs v-model:activeKey="activeDetailTab">

@@ -1,44 +1,44 @@
 <script setup lang="ts">
-import {formatTTL} from "@/utils/format.ts";
-import {invoke} from "@tauri-apps/api/core";
-import {message} from "ant-design-vue";
+import { formatTTL } from "@/utils/format.ts";
+import { invoke } from "@tauri-apps/api/core";
+import { message } from "ant-design-vue";
 import AddKeyModal from "@/layout/components/AddKeyModal/index.vue";
 import ViewKeyModal from "@/layout/components/ViewKeyModal/index.vue";
-import type {KeyType} from "@/types/redis";
+import type { KeyType } from "@/types/redis";
 
 // 定义类型
 interface RedisKey {
-  key: string;
-  type: KeyType;
-  ttl: number;
-  size: number;
+	key: string;
+	type: KeyType;
+	ttl: number;
+	size: number;
 }
 
 interface ConnectionStatus {
-  [connectionId: string]: boolean;
+	[connectionId: string]: boolean;
 }
 
 interface LoadParams {
-  _activeConnectionId: string | null;
-  _activeConnections: ConnectionStatus;
+	_activeConnectionId: string | null;
+	_activeConnections: ConnectionStatus;
 }
 
 interface KeysResponse {
-  success: boolean;
-  keys: RedisKey[];
-  total: number;
-  message?: string;
+	success: boolean;
+	keys: RedisKey[];
+	total: number;
+	message?: string;
 }
 
 interface TableColumn {
-  title: string;
-  dataIndex: string;
-  key: string;
-  ellipsis?: boolean;
-  width?: number;
-  sorter?: (a: RedisKey, b: RedisKey) => number;
-  filters?: { text: string; value: string }[];
-  onFilter?: (value: string, record: RedisKey) => boolean;
+	title: string;
+	dataIndex: string;
+	key: string;
+	ellipsis?: boolean;
+	width?: number;
+	sorter?: (a: RedisKey, b: RedisKey) => number;
+	filters?: { text: string; value: string }[];
+	onFilter?: (value: string, record: RedisKey) => boolean;
 }
 
 // 响应式状态
@@ -53,69 +53,55 @@ const lastLoadedConnectionId = ref<string | null>(null);
 
 // 表格列定义
 const columns = ref<TableColumn[]>([
-  {
-    title: "键名",
-    dataIndex: "key",
-    key: "key",
-    ellipsis: true,
-    sorter: (a: RedisKey, b: RedisKey) => a.key.localeCompare(b.key),
-  },
-  {
-    title: "类型",
-    dataIndex: "type",
-    key: "type",
-    width: 150,
-  },
-  {
-    title: "大小",
-    dataIndex: "size",
-    key: "size",
-    width: 150,
-    sorter: (a: RedisKey, b: RedisKey) => a.size - b.size,
-  },
-  {
-    title: "TTL",
-    dataIndex: "ttl",
-    key: "ttl",
-    width: 150,
-    sorter: (a: RedisKey, b: RedisKey) => a.ttl - b.ttl,
-  },
-  {
-    title: "操作",
-    dataIndex: "operation",
-    key: "operation",
-    width: 150,
-  },
+	{
+		title: "键名",
+		dataIndex: "key",
+		key: "key",
+		ellipsis: true,
+		width: 400,
+		sorter: (a: RedisKey, b: RedisKey) => a.key.localeCompare(b.key),
+	},
+	{
+		title: "类型",
+		dataIndex: "type",
+		key: "type",
+	},
+	{
+		title: "TTL",
+		dataIndex: "ttl",
+		key: "ttl",
+		sorter: (a: RedisKey, b: RedisKey) => a.ttl - b.ttl,
+	},
 ]);
 
 // 分页配置
 const pagination = reactive({
-  current: 1,
-  pageSize: 20,
-  total: 0,
-  showSizeChanger: true,
-  pageSizeOptions: ["10", "20", "50", "100"],
+	current: 1,
+	pageSize: 20,
+	total: 0,
+	showSizeChanger: true,
+	pageSizeOptions: ["10", "20", "50", "100"],
 });
 
 // 检查连接是否已激活
 function isConnected(connectionId: string): boolean {
-  return activeConnections.value[connectionId] === true;
+	return activeConnections.value[connectionId] === true;
 }
 
 // 获取键类型对应的颜色
 function getTypeColor(type: KeyType): string {
-  const typeColors: Record<KeyType, string> = {
-    string: "blue",
-    hash: "green",
-    list: "orange",
-    set: "purple",
-    zset: "red",
-    stream: "cyan",
-    bitmap: "processing",
-    hyperloglog: "magenta",
-    geospatial: "volcano",
-  };
-  return typeColors[type] || "gray";
+	const typeColors: Record<KeyType, string> = {
+		string: "blue",
+		hash: "green",
+		list: "orange",
+		set: "purple",
+		zset: "red",
+		stream: "cyan",
+		bitmap: "processing",
+		hyperloglog: "magenta",
+		geospatial: "volcano",
+	};
+	return typeColors[type] || "gray";
 }
 
 // 模态框引用
@@ -124,168 +110,168 @@ const AddKeyModalRef = ref();
 
 // 显示键详情
 async function showKeyDetail(record: RedisKey): Promise<void> {
-  if (!activeConnectionId.value || !ViewKeyModalRef.value) return;
+	if (!activeConnectionId.value || !ViewKeyModalRef.value) return;
 
-  ViewKeyModalRef.value.use({
-    record,
-    connectionId: activeConnectionId.value,
-  });
+	ViewKeyModalRef.value.use({
+		record,
+		connectionId: activeConnectionId.value,
+	});
 }
 
 // 删除键
 async function deleteKey(record: RedisKey): Promise<void> {
-  if (!activeConnectionId.value || !isConnected(activeConnectionId.value))
-    return;
+	if (!activeConnectionId.value || !isConnected(activeConnectionId.value))
+		return;
 
-  try {
-    await invoke("delete_key", {
-      connectionId: activeConnectionId.value,
-      key: record.key,
-    });
-    message.success(`键 "${record.key}" 已删除`);
+	try {
+		await invoke("delete_key", {
+			connectionId: activeConnectionId.value,
+			key: record.key,
+		});
+		message.success(`键 "${record.key}" 已删除`);
 
-    // 从本地状态中移除键
-    keys.value = keys.value.filter((k) => k.key !== record.key);
-    pagination.total -= 1;
+		// 从本地状态中移除键
+		keys.value = keys.value.filter((k) => k.key !== record.key);
+		pagination.total -= 1;
 
-    // 如果当前页没有数据且不是第一页，则跳转到上一页
-    if (keys.value.length === 0 && pagination.current > 1) {
-      pagination.current -= 1;
-      await loadKeys();
-    }
-  } catch (error) {
-    message.error(`删除键失败: ${error}`);
-  }
+		// 如果当前页没有数据且不是第一页，则跳转到上一页
+		if (keys.value.length === 0 && pagination.current > 1) {
+			pagination.current -= 1;
+			await loadKeys();
+		}
+	} catch (error) {
+		message.error(`删除键失败: ${error}`);
+	}
 }
 
 // 加载键列表
 async function loadKeys(): Promise<void> {
-  if (!activeConnectionId.value || !isConnected(activeConnectionId.value)) {
-    keys.value = [];
-    pagination.total = 0;
-    return;
-  }
+	if (!activeConnectionId.value || !isConnected(activeConnectionId.value)) {
+		keys.value = [];
+		pagination.total = 0;
+		return;
+	}
 
-  loading.value = true;
-  try {
-    const offset = (pagination.current - 1) * pagination.pageSize;
+	loading.value = true;
+	try {
+		const offset = (pagination.current - 1) * pagination.pageSize;
 
-    const response = await invoke<KeysResponse>("get_keys_with_details", {
-      connectionId: activeConnectionId.value,
-      pattern: searchPattern.value || "*",
-      offset: offset,
-      limit: pagination.pageSize,
-    });
+		const response = await invoke<KeysResponse>("get_keys_with_details", {
+			connectionId: activeConnectionId.value,
+			pattern: searchPattern.value || "*",
+			offset: offset,
+			limit: pagination.pageSize,
+		});
 
-    if (response.success) {
-      keys.value = response.keys;
-      pagination.total = response.total || 0;
+		if (response.success) {
+			keys.value = response.keys;
+			pagination.total = response.total || 0;
 
-      // 如果当前页没有数据且不是第一页，则跳转到上一页
-      if (keys.value.length === 0 && pagination.current > 1) {
-        pagination.current -= 1;
-        await loadKeys();
-      }
-    } else {
-      message.error(response.message || "加载键列表失败");
-      keys.value = [];
-      pagination.total = 0;
-    }
-  } catch (error) {
-    message.error(`加载键列表失败: ${error}`);
-    keys.value = [];
-    pagination.total = 0;
-  } finally {
-    loading.value = false;
-  }
+			// 如果当前页没有数据且不是第一页，则跳转到上一页
+			if (keys.value.length === 0 && pagination.current > 1) {
+				pagination.current -= 1;
+				await loadKeys();
+			}
+		} else {
+			message.error(response.message || "加载键列表失败");
+			keys.value = [];
+			pagination.total = 0;
+		}
+	} catch (error) {
+		message.error(`加载键列表失败: ${error}`);
+		keys.value = [];
+		pagination.total = 0;
+	} finally {
+		loading.value = false;
+	}
 }
 
 // 搜索处理
 function handleSearch(): void {
-  if (debounceTimer.value) {
-    clearTimeout(debounceTimer.value);
-  }
+	if (debounceTimer.value) {
+		clearTimeout(debounceTimer.value);
+	}
 
-  debounceTimer.value = setTimeout(() => {
-    pagination.current = 1;
-    loadKeys();
-  }, 300);
+	debounceTimer.value = setTimeout(() => {
+		pagination.current = 1;
+		loadKeys();
+	}, 300);
 }
 
 // 显示添加键模态框
 function showAddKeyModal(): void {
-  if (!activeConnectionId.value || !AddKeyModalRef.value) return;
+	if (!activeConnectionId.value || !AddKeyModalRef.value) return;
 
-  AddKeyModalRef.value.use({
-    connectionId: activeConnectionId.value,
-    onSuccess: async (newKey: RedisKey) => {
-      try {
-        // 更新本地状态
-        keys.value = [newKey, ...keys.value];
-        pagination.total += 1;
+	AddKeyModalRef.value.use({
+		connectionId: activeConnectionId.value,
+		onSuccess: async (newKey: RedisKey) => {
+			try {
+				// 更新本地状态
+				keys.value = [newKey, ...keys.value];
+				pagination.total += 1;
 
-        // 如果当前页已满，跳转到第一页
-        if (keys.value.length > pagination.pageSize) {
-          pagination.current = 1;
-          await loadKeys();
-        }
+				// 如果当前页已满，跳转到第一页
+				if (keys.value.length > pagination.pageSize) {
+					pagination.current = 1;
+					await loadKeys();
+				}
 
-        message.success("键添加成功");
-      } catch (error) {
-        message.error(`添加键失败: ${error}`);
-      }
-    },
-  });
+				message.success("键添加成功");
+			} catch (error) {
+				message.error(`添加键失败: ${error}`);
+			}
+		},
+	});
 }
 
 // 处理表格分页变化
 function handleTableChange(pag: { current: number; pageSize: number }): void {
-  pagination.current = pag.current;
-  pagination.pageSize = pag.pageSize;
-  loadKeys();
+	pagination.current = pag.current;
+	pagination.pageSize = pag.pageSize;
+	loadKeys();
 }
 
 // 加载组件数据
 const load = async ({
-                      _activeConnectionId,
-                      _activeConnections,
-                    }: LoadParams): Promise<void> => {
-  activeConnectionId.value = _activeConnectionId;
-  activeConnections.value = _activeConnections;
+	_activeConnectionId,
+	_activeConnections,
+}: LoadParams): Promise<void> => {
+	activeConnectionId.value = _activeConnectionId;
+	activeConnections.value = _activeConnections;
 
-  // 只有在连接发生变化时才重新加载
-  if (lastLoadedConnectionId.value !== _activeConnectionId) {
-    pagination.current = 1;
-    searchPattern.value = "*";
-    lastLoadedConnectionId.value = _activeConnectionId;
-    await loadKeys();
-  }
+	// 只有在连接发生变化时才重新加载
+	if (lastLoadedConnectionId.value !== _activeConnectionId) {
+		pagination.current = 1;
+		searchPattern.value = "*";
+		lastLoadedConnectionId.value = _activeConnectionId;
+		await loadKeys();
+	}
 };
 
 // 监听连接变化
 watch(activeConnectionId, (newId) => {
-  if (newId && lastLoadedConnectionId.value !== newId) {
-    pagination.current = 1;
-    loadKeys();
-  }
+	if (newId && lastLoadedConnectionId.value !== newId) {
+		pagination.current = 1;
+		loadKeys();
+	}
 });
 
 // 组件挂载时加载当前数据库信息
 onMounted(async () => {
-  if (activeConnectionId.value) {
-    try {
-      const dbInfo = await invoke<{ db: number }>("get_current_db", {
-        connectionId: activeConnectionId.value,
-      });
-      currentDb.value = dbInfo.db || 0;
-    } catch (error) {
-      console.error("获取当前数据库失败:", error);
-    }
-  }
+	if (activeConnectionId.value) {
+		try {
+			const dbInfo = await invoke<{ db: number }>("get_current_db", {
+				connectionId: activeConnectionId.value,
+			});
+			currentDb.value = dbInfo.db || 0;
+		} catch (error) {
+			console.error("获取当前数据库失败:", error);
+		}
+	}
 });
 
 defineExpose({
-  load,
+	load,
 });
 </script>
 
@@ -354,11 +340,32 @@ defineExpose({
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.dataIndex === 'key'">
-            <a-tooltip :title="record.key" placement="top">
-              <span class="cursor-pointer hover:text-blue-500" @click="showKeyDetail(record)">
-                {{ record.key }}
-              </span>
-            </a-tooltip>
+            <div class="flex justify-between">
+              <a-tooltip :title="record.key" placement="top">
+                <span class="cursor-pointer hover:text-blue-500" @click="showKeyDetail(record)">
+                  {{ record.key }}
+                </span>
+              </a-tooltip>
+              <div>
+                <a-tooltip title="查看详情">
+                  <a-button size="small" type="link" @click="showKeyDetail(record)">
+                    详情
+                  </a-button>
+                </a-tooltip>
+                <a-tooltip title="删除键">
+                  <a-popconfirm
+                    title="确定要删除这个键吗？"
+                    ok-text="确定"
+                    cancel-text="取消"
+                    @confirm="deleteKey(record)"
+                  >
+                    <a-button size="small" type="link" danger>
+                      删除
+                    </a-button>
+                  </a-popconfirm>
+                </a-tooltip>
+              </div>
+            </div>
           </template>
 
           <template v-if="column.dataIndex === 'type'">
@@ -370,33 +377,6 @@ defineExpose({
           <template v-if="column.dataIndex === 'ttl'">
             <span v-if="record.ttl === -1">永不过期</span>
             <span v-else>{{ formatTTL(record.ttl) }}</span>
-          </template>
-
-          <template v-if="column.dataIndex === 'operation'">
-            <a-space>
-              <a-tooltip title="查看详情">
-                <a-button size="small" @click="showKeyDetail(record)">
-                  <template #icon>
-                    <eye-outlined/>
-                  </template>
-                </a-button>
-              </a-tooltip>
-
-              <a-tooltip title="删除键">
-                <a-popconfirm
-                  title="确定要删除这个键吗？"
-                  ok-text="确定"
-                  cancel-text="取消"
-                  @confirm="deleteKey(record)"
-                >
-                  <a-button size="small" danger>
-                    <template #icon>
-                      <delete-outlined/>
-                    </template>
-                  </a-button>
-                </a-popconfirm>
-              </a-tooltip>
-            </a-space>
           </template>
         </template>
 
@@ -416,10 +396,10 @@ defineExpose({
   </div>
 </template>
 
-<style scoped>
+<style scoped lang="less">
 :deep(.ant-card) {
   .ant-card-body {
-    padding: 10px 20px 20px 20px;
+    padding: 15px 20px;
   }
 }
 </style>

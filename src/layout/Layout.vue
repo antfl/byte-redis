@@ -95,7 +95,7 @@ async function loadKeys() {
         <ConnectionManager @on-success="connectSuccess"/>
 
         <!-- 数据库 -->
-        <DatabaseList ref="DatabaseListRef" @on-success="loadKeys"/>
+<!--        <DatabaseList ref="DatabaseListRef" @on-success="loadKeys"/>-->
 
         <!-- 服务器信息 -->
         <ServerInfo ref="ServerInfoRef"/>

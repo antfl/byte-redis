@@ -65,6 +65,7 @@ defineExpose({ use });
     title="添加新键"
     :footer="null"
     width="600px"
+    :centered="true"
     class="byte-modal"
     :maskClosable="false"
     :keyboard="false"

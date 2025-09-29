@@ -83,6 +83,8 @@ defineExpose({ use });
     v-model:open="visible"
     :title="modalTitle"
     width="600px"
+    :centered="true"
+    :mask="false"
     :footer="null"
     :maskClosable="false"
   >

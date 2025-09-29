@@ -9,6 +9,7 @@
        <span class="mr-12px">-</span>
        <span class="color-#1677ff font-600">127.0.0.1</span>
      </div>
+     <DatabaseList />
    </div>
 
     <div class="window-controls">
@@ -34,6 +35,7 @@ import {
 	ShrinkOutlined,
 } from "@ant-design/icons-vue";
 import Logo from "@/assets/images/logo.jpg";
+import DatabaseList from "@/layout/components/DatabaseList/index.vue";
 
 const appName = import.meta.env.VITE_APP_NAME || "Byte Redis";
 
