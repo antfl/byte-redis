@@ -17,7 +17,7 @@
         <MinusOutlined />
       </div>
       <div class="control-btn" @click="toggleMaximize" :title="isMaximized ? '还原' : '最大化'">
-        <img class="size-18px" v-if="isMaximized" :src="Restore" alt="">
+        <img class="size-14px" v-if="isMaximized" :src="Restore" alt="">
         <component v-else :is="BorderOutlined" />
       </div>
       <div class="control-btn close-btn" @click="close" title="关闭">
