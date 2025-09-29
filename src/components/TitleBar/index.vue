@@ -17,7 +17,8 @@
         <MinusOutlined />
       </div>
       <div class="control-btn" @click="toggleMaximize" :title="isMaximized ? '还原' : '最大化'">
-        <component :is="isMaximized ? ShrinkOutlined : BorderOutlined" />
+        <img class="size-18px" v-if="isMaximized" :src="Restore" alt="">
+        <component v-else :is="BorderOutlined" />
       </div>
       <div class="control-btn close-btn" @click="close" title="关闭">
         <CloseOutlined />
@@ -32,9 +33,9 @@ import {
 	MinusOutlined,
 	BorderOutlined,
 	CloseOutlined,
-	ShrinkOutlined,
 } from "@ant-design/icons-vue";
 import Logo from "@/assets/images/logo.jpg";
+import Restore from "@/assets/svg/restore.svg";
 import DatabaseList from "@/layout/components/DatabaseList/index.vue";
 
 const appName = import.meta.env.VITE_APP_NAME || "Byte Redis";

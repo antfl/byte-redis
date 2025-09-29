@@ -335,6 +335,7 @@ defineExpose({
         :pagination="pagination"
         :loading="loading"
         size="small"
+        :scroll="{ x: 'auto', y: 500 }"
         @change="handleTableChange"
         :rowKey="(record: RedisKey) => record.key"
       >
