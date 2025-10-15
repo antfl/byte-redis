@@ -64,10 +64,6 @@ defineExpose({ load });
 </script>
 
 <template>
-  <a-card  size="small" :bordered="false">
-   <template #title>
-     <div class="split-line font-400">服务器状态</div>
-   </template>
     <a-row :gutter="[12, 12]">
       <a-col :span="12">
         <a-tag class="w-80%" color="cyan" :bordered="false">
@@ -94,5 +90,4 @@ defineExpose({ load });
         </a-tag>
       </a-col>
     </a-row>
-  </a-card>
 </template>

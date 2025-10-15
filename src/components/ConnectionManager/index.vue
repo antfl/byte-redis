@@ -6,7 +6,7 @@ import type {
 	ConnectionModalAction,
 	ConnectResponse,
 } from "@/types";
-import ConnectionModal from "@/layout/components/ConnectionModal/index.vue";
+import ConnectionModal from "@/components/ConnectionModal/index.vue";
 
 import { store } from "@/utils/storage.ts";
 
@@ -153,7 +153,6 @@ init();
       </div>
       <div class="flex gap-10px">
         <PlusOutlined @click="newConnection"/>
-        <SwapOutlined/>
       </div>
     </div>
 

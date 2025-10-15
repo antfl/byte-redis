@@ -1,9 +1,11 @@
 <script setup>
-import ConnectionManager from "@/layout/components/ConnectionManager/index.vue";
-import DatabaseList from "@/layout/components/DatabaseList/index.vue";
-import ServerInfo from "@/layout/components/ServerInfo/index.vue";
-import RedisData from "@/layout/components/RedisData/index.vue";
-import TitleBar from "@/components/TitleBar/index.vue";
+import ConnectionManager from "@/components/ConnectionManager/index.vue";
+// import DatabaseList from "@/layout/components/DatabaseList/index.vue";
+import ServerInfo from "@/components/ServerInfo/index.vue";
+import RedisData from "@/components/RedisData/index.vue";
+import TitleBar from "@/layout/components/TitleBar/index.vue";
+import DatabaseList from "@/components/DatabaseList/index.vue";
+import ViewFooter from "@/layout/components/ViewFooter/index.vue";
 
 // 创建存储实例
 import { store } from "@/utils/storage.ts";
@@ -62,13 +64,13 @@ const loadServerInfo = () => {
 };
 
 /** 数据库相关 */
-const DatabaseListRef = ref();
+// const DatabaseListRef = ref();
 
 async function loadDatabaseInfo() {
-	DatabaseListRef.value.load({
-		_activeConnections: activeConnections.value,
-		_activeConnectionId: activeConnectionId.value,
-	});
+	// DatabaseListRef.value.load({
+	// 	_activeConnections: activeConnections.value,
+	// 	_activeConnectionId: activeConnectionId.value,
+	// });
 }
 
 /** Redis 数据相关 */
@@ -89,21 +91,18 @@ async function loadKeys() {
     <a-layout-header class="h-[var(--title-bar-height)]!">
       <TitleBar/>
     </a-layout-header>
-    <a-layout class="h-[calc(100vh_-_var(--title-bar-height))] overflow-hidden">
+    <a-layout class="h-[calc(100vh_-_var(--title-bar-height)_-_var(--view-footer-height))] overflow-hidden">
       <a-layout-sider theme="light" width="280">
-        <!-- 连接管理 -->
-        <ConnectionManager @on-success="connectSuccess"/>
-
-        <!-- 数据库 -->
-<!--        <DatabaseList ref="DatabaseListRef" @on-success="loadKeys"/>-->
-
         <!-- 服务器信息 -->
         <ServerInfo ref="ServerInfoRef"/>
+        <!-- 连接管理 -->
+        <ConnectionManager @on-success="connectSuccess"/>
       </a-layout-sider>
       <a-layout-content>
         <!-- Redis 数据 -->
         <RedisData ref="RedisDataRef"/>
       </a-layout-content>
     </a-layout>
+    <ViewFooter/>
   </a-layout>
 </template>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { KeyType } from "@/types/redis";
+import type { KeyType } from "@/types/redis.ts";
 import { message } from "ant-design-vue";
 
 const visible = ref(false);

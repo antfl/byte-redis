@@ -84,7 +84,6 @@ defineExpose({ use });
     :title="modalTitle"
     width="600px"
     :centered="true"
-    :mask="false"
     :footer="null"
     :maskClosable="false"
   >
@@ -103,9 +102,6 @@ defineExpose({ use });
       </a-form-item>
       <a-form-item label="密码" name="password">
         <a-input-password v-model:value="formState.password" placeholder="密码"/>
-      </a-form-item>
-      <a-form-item label="数据库" name="db">
-        <a-input-number v-model:value="formState.db" :min="0"/>
       </a-form-item>
       <div class="flex gap-10px justify-end">
         <a-button @click="handleCancel">取消</a-button>

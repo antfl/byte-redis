@@ -2,9 +2,9 @@
 import { formatTTL } from "@/utils/format.ts";
 import { invoke } from "@tauri-apps/api/core";
 import { message } from "ant-design-vue";
-import AddKeyModal from "@/layout/components/AddKeyModal/index.vue";
-import ViewKeyModal from "@/layout/components/ViewKeyModal/index.vue";
-import type { KeyType } from "@/types/redis";
+import AddKeyModal from "@/components/AddKeyModal/index.vue";
+import ViewKeyModal from "@/components/ViewKeyModal/index.vue";
+import type { KeyType } from "@/types/redis.ts";
 
 // 定义类型
 interface RedisKey {
@@ -206,6 +206,7 @@ function showAddKeyModal(): void {
 		connectionId: activeConnectionId.value,
 		onSuccess: async (newKey: RedisKey) => {
 			try {
+
 				// 更新本地状态
 				keys.value = [newKey, ...keys.value];
 				pagination.total += 1;
@@ -276,9 +277,7 @@ defineExpose({
 </script>
 
 <template>
-  <div class="p-8px">
-
-    <a-card size="small" :bordered="false">
+  <div>
       <a-tabs
         class="mb-16px"
         :tabBarStyle="{
@@ -302,14 +301,13 @@ defineExpose({
       <div class="flex items-center  mb-16px">
         <a-form layout="inline" class="">
           <a-form-item class="">
-            <a-input-search
+            <a-input
               v-model:value="searchPattern"
               placeholder="搜索键 (支持通配符 *)"
               @search="handleSearch"
               @input="handleSearch"
               allow-clear
-            >
-            </a-input-search>
+            />
           </a-form-item>
         </a-form>
 
@@ -318,7 +316,7 @@ defineExpose({
             <template #icon>
               <reload-outlined/>
             </template>
-            重置
+            搜索
           </a-button>
           <a-button type="primary" @click="showAddKeyModal" :disabled="!activeConnectionId">
             <template #icon>
@@ -387,7 +385,6 @@ defineExpose({
           </div>
         </template>
       </a-table>
-    </a-card>
 
     <!-- 添加键模态框 -->
     <AddKeyModal ref="AddKeyModalRef"/>
@@ -396,11 +393,3 @@ defineExpose({
     <ViewKeyModal ref="ViewKeyModalRef"/>
   </div>
 </template>
-
-<style scoped lang="less">
-:deep(.ant-card) {
-  .ant-card-body {
-    padding: 15px 20px;
-  }
-}
-</style>
