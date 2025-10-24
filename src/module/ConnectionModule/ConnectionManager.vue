@@ -1,0 +1,56 @@
+<script setup lang="ts">
+import ConnectionModal from "@/module/ConnectionModule/ConnectionModal/index.vue";
+import downOutlined from "@/assets/svg/down-outlined.svg";
+import { Connection, useConnectionStore } from "@/stores/useConnectionStore.ts";
+import { computed } from "vue";
+
+const connectionStore = useConnectionStore();
+
+const connections = computed(() => connectionStore.connections);
+
+const onClick = (item: Connection) => {
+	connectionStore.setActiveConnection(item.id);
+};
+
+const ConnectionModalRef = ref();
+const newConnection = () => {
+	ConnectionModalRef.value.use({
+		onSuccess: (data: Connection) => {
+			connectionStore.createConnection(data);
+		},
+	});
+};
+
+const isConnection = computed(() => connectionStore.activeConnectionId);
+
+const activeConnection = computed(() => connectionStore.activeConnection);
+</script>
+
+<template>
+  <a-dropdown class="ml-24px" trigger="click">
+    <div class="flex items-center">
+      <div class="leading-0px">
+        <a-badge :status="isConnection ? 'success' : 'default'"/>
+      </div>
+      <a-tag class="mr-5px" :bordered="false">
+        {{ activeConnection?.name || '新建连接' }}
+      </a-tag>
+      <img class="size-10px" :src="downOutlined" alt="">
+    </div>
+    <template #overlay>
+      <div>
+        <a-menu>
+          <a-menu-item key="1" @click="newConnection">
+            <PlusOutlined/>
+            <span class="ml-5px">新建连接</span>
+          </a-menu-item>
+          <a-menu-item @click="onClick(item)" v-for="item in connections" :key="item.id">
+            {{ item.name }}
+          </a-menu-item>
+        </a-menu>
+      </div>
+    </template>
+  </a-dropdown>
+
+  <ConnectionModal ref="ConnectionModalRef"/>
+</template>

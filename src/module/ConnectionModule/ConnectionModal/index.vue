@@ -85,17 +85,21 @@ defineExpose({ use });
     width="600px"
     :centered="true"
     :footer="null"
+    :mask="false"
     :maskClosable="false"
   >
-    <a-form ref="formRef" layout="vertical" :model="formState">
-      <a-form-item label="连接名称" name="name" required>
+    <a-form  ref="formRef" :model="formState">
+      <a-form-item label="连接名称" name="name" >
         <a-input v-model:value="formState.name" placeholder="连接名称"/>
       </a-form-item>
-      <a-form-item label="主机" name="host" required>
-        <a-input v-model:value="formState.host" placeholder="主机地址"/>
-      </a-form-item>
-      <a-form-item label="端口" name="port" required>
-        <a-input-number v-model:value="formState.port" :min="1" :max="65535"/>
+      <a-form-item label="主机" name="host" >
+       <div class="flex gap-8px">
+         <a-input v-model:value="formState.host" placeholder="主机地址"/>
+         <div class="flex items-center">
+           <span class="w-60px">端口</span>
+           <a-input-number v-model:value="formState.port" :min="1" :max="65535"/>
+         </div>
+       </div>
       </a-form-item>
       <a-form-item label="用户名" name="username">
         <a-input v-model:value="formState.username" placeholder="用户名（可选）"/>
@@ -104,8 +108,7 @@ defineExpose({ use });
         <a-input-password v-model:value="formState.password" placeholder="密码"/>
       </a-form-item>
       <div class="flex gap-10px justify-end">
-        <a-button @click="handleCancel">取消</a-button>
-        <a-button type="primary" @click="handleSubmit">保存</a-button>
+        <a-button class="py-2px! h-auto" type="primary" @click="handleSubmit">提交</a-button>
       </div>
     </a-form>
   </a-modal>

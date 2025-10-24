@@ -4,14 +4,24 @@ import Layout from "@/layout/Layout.vue";
 
 const themeConfig = {
 	token: {
-		borderRadius: 3,
+		borderRadius: 2,
 	},
 };
 </script>
 
 <template>
-  <a-config-provider :theme="themeConfig" :locale="zhCN">
-    <Layout/>
-  </a-config-provider>
+  <div class="app-container">
+    <a-config-provider :theme="themeConfig" :locale="zhCN">
+      <Layout/>
+    </a-config-provider>
+  </div>
 </template>
+
+<style>
+.app-container {
+  min-width: 800px;
+  min-height: 600px;
+  overflow: hidden;
+}
+</style>
 

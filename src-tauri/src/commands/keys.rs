@@ -1,6 +1,16 @@
 use crate::state::{AppState};
 use serde::Serialize;
 use tauri::State;
+use serde_json::json;
+use chrono::{DateTime, Utc, TimeZone};
+
+// 键基本信息结构体
+#[derive(Debug, Serialize)]
+pub struct KeyInfo {
+    pub key: String,
+    #[serde(rename = "type")]
+    pub key_type: String,
+}
 
 // 键详细信息结构体
 #[derive(Debug, Serialize)]
@@ -10,6 +20,8 @@ pub struct KeyDetail {
     pub key_type: String,
     pub ttl: i64,
     pub size: usize,
+    pub create_time: String, // ISO 8601 格式的时间字符串
+    pub value: serde_json::Value, // 根据类型存储不同的值
 }
 
 // 键列表响应结构体
@@ -18,19 +30,17 @@ pub struct KeysResponse {
     pub success: bool,
     pub message: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub keys: Option<Vec<String>>,
-    pub total: Option<usize>,
-    pub cursor: Option<u64>,
+    pub keys: Option<Vec<KeyInfo>>,
+    pub total: usize,
 }
 
-// 键详细信息响应结构体
+// 键详情响应结构体
 #[derive(Debug, Serialize)]
-pub struct KeysWithDetailsResponse {
+pub struct KeyDetailResponse {
     pub success: bool,
     pub message: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub keys: Option<Vec<KeyDetail>>,
-    pub total: Option<usize>,
+    pub detail: Option<KeyDetail>,
 }
 
 // 通用响应结构体
@@ -97,7 +107,7 @@ pub async fn set_key(
     }
 }
 
-// 获取键值命令
+// 获取键值命令 - 修复 nil 响应问题
 #[tauri::command]
 pub async fn get_key(
     connection_id: String,
@@ -109,11 +119,17 @@ pub async fn get_key(
     if let Some(conn_state) = connections.get(&connection_id) {
         match conn_state.client.get_connection() {
             Ok(mut conn) => {
-                match redis::cmd("GET").arg(&key).query::<String>(&mut conn) {
-                    Ok(value) => Ok(RedisResponse {
+                // 使用 Option<String> 处理 nil 响应
+                match redis::cmd("GET").arg(&key).query::<Option<String>>(&mut conn) {
+                    Ok(Some(value)) => Ok(RedisResponse {
                         success: true,
                         message: format!("成功获取 {}", key),
                         value: Some(value),
+                    }),
+                    Ok(None) => Ok(RedisResponse {
+                        success: true,
+                        message: format!("键 {} 存在但值为空", key),
+                        value: None,
                     }),
                     Err(e) => Ok(RedisResponse {
                         success: false,
@@ -137,13 +153,12 @@ pub async fn get_key(
     }
 }
 
-// 分页获取所有键命令
+
+// 获取键列表（只返回键名和类型）
 #[tauri::command]
 pub async fn get_keys(
     connection_id: String,
-    cursor: u64,
     pattern: String,
-    count: usize,
     state: State<'_, AppState>,
 ) -> Result<KeysResponse, String> {
     let connections = state.connections.lock().unwrap();
@@ -151,46 +166,90 @@ pub async fn get_keys(
     if let Some(conn_state) = connections.get(&connection_id) {
         match conn_state.client.get_connection() {
             Ok(mut conn) => {
-                let mut cmd = redis::cmd("SCAN");
-                cmd.arg(cursor)
-                    .arg("MATCH")
-                    .arg(&pattern)
-                    .arg("COUNT")
-                    .arg(count);
+                // 使用 SCAN 命令分批获取键名
+                let mut keys_with_info = Vec::new();
+                let mut cursor: u64 = 0;
+                let batch_size = 500; // 每批处理的数量
+                let mut total = 0;
 
-                let res: (u64, Vec<String>) = match cmd.query(&mut conn) {
-                    Ok(r) => r,
-                    Err(e) => {
-                        return Ok(KeysResponse {
-                            success: false,
-                            message: format!("SCAN命令失败: {}", e),
-                            keys: None,
-                            total: None,
-                            cursor: None,
-                        })
+                loop {
+                    // 执行 SCAN 命令
+                    let mut cmd = redis::cmd("SCAN");
+                    cmd.arg(cursor)
+                        .arg("MATCH")
+                        .arg(&pattern)
+                        .arg("COUNT")
+                        .arg(batch_size);
+
+                    let (new_cursor, keys): (u64, Vec<String>) = match cmd.query(&mut conn) {
+                        Ok(r) => r,
+                        Err(e) => {
+                            return Ok(KeysResponse {
+                                success: false,
+                                message: format!("SCAN命令失败: {}", e),
+                                keys: None,
+                                total: 0,
+                            })
+                        }
+                    };
+
+                    total += keys.len();
+                    cursor = new_cursor;
+
+                    // 如果本批次没有键，继续下一批
+                    if keys.is_empty() {
+                        if cursor == 0 {
+                            break;
+                        }
+                        continue;
                     }
-                };
 
-                // 获取总数
-                let total: usize = match redis::cmd("DBSIZE").query(&mut conn) {
-                    Ok(t) => t,
-                    Err(_) => 0,
-                };
+                    // 使用管道批量获取键类型
+                    let mut pipe = redis::pipe();
+                    for key in &keys {
+                        pipe.cmd("TYPE").arg(key);
+                    }
+
+                    let key_types: Vec<String> = match pipe.query(&mut conn) {
+                        Ok(types) => types,
+                        Err(e) => {
+                            return Ok(KeysResponse {
+                                success: false,
+                                message: format!("批量获取键类型失败: {}", e),
+                                keys: None,
+                                total: 0,
+                            })
+                        }
+                    };
+
+                    // 组合键名和类型
+                    for (i, key) in keys.into_iter().enumerate() {
+                        if let Some(key_type) = key_types.get(i) {
+                            keys_with_info.push(KeyInfo {
+                                key,
+                                key_type: key_type.clone(),
+                            });
+                        }
+                    }
+
+                    // 检查是否完成
+                    if cursor == 0 {
+                        break;
+                    }
+                }
 
                 Ok(KeysResponse {
                     success: true,
                     message: "成功获取键列表".to_string(),
-                    keys: Some(res.1),
-                    total: Some(total),
-                    cursor: Some(res.0),
+                    keys: Some(keys_with_info),
+                    total,
                 })
             }
             Err(e) => Ok(KeysResponse {
                 success: false,
                 message: format!("获取连接失败: {}", e),
                 keys: None,
-                total: None,
-                cursor: None,
+                total: 0,
             }),
         }
     } else {
@@ -198,134 +257,200 @@ pub async fn get_keys(
             success: false,
             message: "Redis 未连接".to_string(),
             keys: None,
-            total: None,
-            cursor: None,
+            total: 0,
         })
     }
 }
 
 #[tauri::command]
-pub async fn get_keys_with_details(
+pub async fn get_key_detail(
     connection_id: String,
-    pattern: String,
-    offset: usize,
-    limit: usize,
+    key: String,
     state: State<'_, AppState>,
-) -> Result<KeysWithDetailsResponse, String> {
+) -> Result<KeyDetailResponse, String> {
     let connections = state.connections.lock().unwrap();
 
     if let Some(conn_state) = connections.get(&connection_id) {
         match conn_state.client.get_connection() {
             Ok(mut conn) => {
-                // 使用 SCAN 命令获取键名
-                let mut cmd = redis::cmd("SCAN");
-                cmd.cursor_arg(0)
-                    .arg("MATCH")
-                    .arg(&pattern)
-                    .arg("COUNT")
-                    .arg(10000);
-
-                let res: (u64, Vec<String>) = match cmd.query(&mut conn) {
-                    Ok(r) => r,
+                // 检查键是否存在
+                let exists: bool = match redis::cmd("EXISTS").arg(&key).query(&mut conn) {
+                    Ok(exists) => exists,
                     Err(e) => {
-                        return Ok(KeysWithDetailsResponse {
+                        return Ok(KeyDetailResponse {
                             success: false,
-                            message: format!("SCAN命令失败: {}", e),
-                            keys: None,
-                            total: None,
+                            message: format!("检查键存在失败: {}", e),
+                            detail: None,
                         })
                     }
                 };
 
-                let all_keys = res.1;
-                let total = all_keys.len();
-
-                // 分页处理
-                let start = offset;
-                let end = std::cmp::min(start + limit, total);
-                let page_keys = &all_keys[start..end];
-
-                // 使用管道获取每个键的详细信息
-                let mut pipe = redis::pipe();
-                for key in page_keys {
-                    pipe.cmd("TYPE").arg(key)
-                        .cmd("TTL").arg(key);
+                if !exists {
+                    return Ok(KeyDetailResponse {
+                        success: false,
+                        message: format!("键 {} 不存在", key),
+                        detail: None,
+                    });
                 }
 
-                let results: Vec<redis::Value> = match pipe.query(&mut conn) {
-                    Ok(r) => r,
+                // 获取键类型
+                let key_type = match redis::cmd("TYPE").arg(&key).query::<String>(&mut conn) {
+                    Ok(t) => t,
                     Err(e) => {
-                        return Ok(KeysWithDetailsResponse {
+                        return Ok(KeyDetailResponse {
                             success: false,
-                            message: format!("管道查询失败: {}", e),
-                            keys: None,
-                            total: None,
+                            message: format!("获取键类型失败: {}", e),
+                            detail: None,
                         })
                     }
                 };
 
-                // 解析结果
-                let mut keys_with_details = Vec::new();
-                let mut i = 0;
-                for key in page_keys {
-                    if i + 1 >= results.len() {
-                        break;
+                // 获取TTL
+                let ttl = match redis::cmd("TTL").arg(&key).query::<i64>(&mut conn) {
+                    Ok(t) => t,
+                    Err(e) => {
+                        return Ok(KeyDetailResponse {
+                            success: false,
+                            message: format!("获取TTL失败: {}", e),
+                            detail: None,
+                        })
                     }
+                };
 
-                    // 解析类型
-                    let key_type = match &results[i] {
-                        redis::Value::Data(data) => String::from_utf8_lossy(data).to_string(),
-                        redis::Value::Status(s) => s.clone(),
-                        _ => "unknown".to_string(),
-                    };
+                // 获取键大小
+                let size = match get_key_size_internal(&mut conn, &key) {
+                    Ok(s) => s,
+                    Err(e) => {
+                        return Ok(KeyDetailResponse {
+                            success: false,
+                            message: format!("获取键大小失败: {}", e),
+                            detail: None,
+                        })
+                    }
+                };
 
-                    // 解析 TTL
-                    let ttl = match &results[i+1] {
-                        redis::Value::Int(n) => *n as i64,
-                        _ => -1,
-                    };
+                // 获取创建时间（Redis不直接支持，这里使用最后修改时间作为近似值）
+                let last_modified: i64 = match redis::cmd("LASTSAVE").query(&mut conn) {
+                    Ok(t) => t,
+                    Err(_) => Utc::now().timestamp(),
+                };
 
-                    // 获取键大小
-                    let size = match get_key_size_internal(&mut conn, key) {
-                        Ok(size) => size,
-                        Err(_) => 0, // 如果获取大小失败，使用 0 作为默认值
-                    };
+                let create_time = match Utc.timestamp_opt(last_modified, 0) {
+                    chrono::LocalResult::Single(dt) => dt,
+                    _ => Utc::now(),
+                };
 
-                    keys_with_details.push(KeyDetail {
+                // 根据类型获取值
+                let value = match key_type.as_str() {
+                    "string" => {
+                        let val: String = match redis::cmd("GET").arg(&key).query(&mut conn) {
+                            Ok(v) => v,
+                            Err(e) => {
+                                return Ok(KeyDetailResponse {
+                                    success: false,
+                                    message: format!("获取字符串值失败: {}", e),
+                                    detail: None,
+                                })
+                            }
+                        };
+                        json!(val)
+                    }
+                    "hash" => {
+                        let val: Vec<(String, String)> = match redis::cmd("HGETALL").arg(&key).query(&mut conn) {
+                            Ok(v) => v,
+                            Err(e) => {
+                                return Ok(KeyDetailResponse {
+                                    success: false,
+                                    message: format!("获取哈希值失败: {}", e),
+                                    detail: None,
+                                })
+                            }
+                        };
+                        let hash_items: Vec<serde_json::Value> = val.into_iter().map(|(field, value)| {
+                            json!({
+                                "field": field,
+                                "value": value
+                            })
+                        }).collect();
+                        json!(hash_items)
+                    }
+                    "list" => {
+                        let val: Vec<String> = match redis::cmd("LRANGE").arg(&key).arg(0).arg(-1).query(&mut conn) {
+                            Ok(v) => v,
+                            Err(e) => {
+                                return Ok(KeyDetailResponse {
+                                    success: false,
+                                    message: format!("获取列表值失败: {}", e),
+                                    detail: None,
+                                })
+                            }
+                        };
+                        json!(val)
+                    }
+                    "set" => {
+                        let val: Vec<String> = match redis::cmd("SMEMBERS").arg(&key).query(&mut conn) {
+                            Ok(v) => v,
+                            Err(e) => {
+                                return Ok(KeyDetailResponse {
+                                    success: false,
+                                    message: format!("获取集合值失败: {}", e),
+                                    detail: None,
+                                })
+                            }
+                        };
+                        json!(val)
+                    }
+                    "zset" => {
+                        let val: Vec<(String, f64)> = match redis::cmd("ZRANGE").arg(&key).arg(0).arg(-1).arg("WITHSCORES").query(&mut conn) {
+                            Ok(v) => v,
+                            Err(e) => {
+                                return Ok(KeyDetailResponse {
+                                    success: false,
+                                    message: format!("获取有序集合值失败: {}", e),
+                                    detail: None,
+                                })
+                            }
+                        };
+                        let zset_items: Vec<serde_json::Value> = val.into_iter().map(|(value, score)| {
+                            json!({
+                                "value": value,
+                                "score": score
+                            })
+                        }).collect();
+                        json!(zset_items)
+                    }
+                    _ => json!(null),
+                };
+
+                Ok(KeyDetailResponse {
+                    success: true,
+                    message: "成功获取键详情".to_string(),
+                    detail: Some(KeyDetail {
                         key: key.clone(),
                         key_type,
                         ttl,
                         size,
-                    });
-
-                    i += 2;
-                }
-
-                Ok(KeysWithDetailsResponse {
-                    success: true,
-                    message: "成功获取键列表".to_string(),
-                    keys: Some(keys_with_details),
-                    total: Some(total),
+                        create_time: create_time.to_rfc3339(),
+                        value,
+                    }),
                 })
             }
-            Err(e) => Ok(KeysWithDetailsResponse {
+            Err(e) => Ok(KeyDetailResponse {
                 success: false,
                 message: format!("获取连接失败: {}", e),
-                keys: None,
-                total: None,
+                detail: None,
             }),
         }
     } else {
-        Ok(KeysWithDetailsResponse {
+        Ok(KeyDetailResponse {
             success: false,
             message: "Redis 未连接".to_string(),
-            keys: None,
-            total: None,
+            detail: None,
         })
     }
 }
 
-// 获取键大小
+// 获取键大小（内部函数）
 fn get_key_size_internal(conn: &mut redis::Connection, key: &str) -> Result<usize, String> {
     // 尝试使用 MEMORY USAGE 命令
     if let Ok(size) = redis::cmd("MEMORY").arg("USAGE").arg(key).query::<usize>(conn) {
@@ -491,5 +616,553 @@ pub async fn delete_key(
         }
     } else {
         Err("Redis 未连接".to_string())
+    }
+}
+
+
+// 新增命令：重命名键
+#[tauri::command]
+pub async fn rename_key(
+    connection_id: String,
+    old_key: String,
+    new_key: String,
+    state: State<'_, AppState>,
+) -> Result<RedisResponse, String> {
+    let connections = state.connections.lock().unwrap();
+
+    if let Some(conn_state) = connections.get(&connection_id) {
+        match conn_state.client.get_connection() {
+            Ok(mut conn) => {
+                match redis::cmd("RENAME")
+                    .arg(&old_key)
+                    .arg(&new_key)
+                    .query::<()>(&mut conn)
+                {
+                    Ok(_) => Ok(RedisResponse {
+                        success: true,
+                        message: format!("成功重命名 {} 为 {}", old_key, new_key),
+                        value: None,
+                    }),
+                    Err(e) => Ok(RedisResponse {
+                        success: false,
+                        message: format!("重命名失败: {}", e),
+                        value: None,
+                    }),
+                }
+            }
+            Err(e) => Ok(RedisResponse {
+                success: false,
+                message: format!("获取连接失败: {}", e),
+                value: None,
+            }),
+        }
+    } else {
+        Ok(RedisResponse {
+            success: false,
+            message: "Redis 未连接".to_string(),
+            value: None,
+        })
+    }
+}
+
+// 新增命令：更新哈希字段
+#[tauri::command]
+pub async fn update_hash_field(
+    connection_id: String,
+    key: String,
+    field: String,
+    value: String,
+    state: State<'_, AppState>,
+) -> Result<RedisResponse, String> {
+    let connections = state.connections.lock().unwrap();
+
+    if let Some(conn_state) = connections.get(&connection_id) {
+        match conn_state.client.get_connection() {
+            Ok(mut conn) => {
+                match redis::cmd("HSET")
+                    .arg(&key)
+                    .arg(&field)
+                    .arg(&value)
+                    .query::<i64>(&mut conn)
+                {
+                    Ok(_) => Ok(RedisResponse {
+                        success: true,
+                        message: format!("成功更新 {} 的字段 {}", key, field),
+                        value: None,
+                    }),
+                    Err(e) => Ok(RedisResponse {
+                        success: false,
+                        message: format!("更新失败: {}", e),
+                        value: None,
+                    }),
+                }
+            }
+            Err(e) => Ok(RedisResponse {
+                success: false,
+                message: format!("获取连接失败: {}", e),
+                value: None,
+            }),
+        }
+    } else {
+        Ok(RedisResponse {
+            success: false,
+            message: "Redis 未连接".to_string(),
+            value: None,
+        })
+    }
+}
+
+// 新增命令：删除哈希字段
+#[tauri::command]
+pub async fn delete_hash_field(
+    connection_id: String,
+    key: String,
+    field: String,
+    state: State<'_, AppState>,
+) -> Result<RedisResponse, String> {
+    let connections = state.connections.lock().unwrap();
+
+    if let Some(conn_state) = connections.get(&connection_id) {
+        match conn_state.client.get_connection() {
+            Ok(mut conn) => {
+                match redis::cmd("HDEL")
+                    .arg(&key)
+                    .arg(&field)
+                    .query::<i64>(&mut conn)
+                {
+                    Ok(count) => {
+                        if count > 0 {
+                            Ok(RedisResponse {
+                                success: true,
+                                message: format!("成功删除 {} 的字段 {}", key, field),
+                                value: None,
+                            })
+                        } else {
+                            Ok(RedisResponse {
+                                success: false,
+                                message: format!("字段 {} 不存在", field),
+                                value: None,
+                            })
+                        }
+                    }
+                    Err(e) => Ok(RedisResponse {
+                        success: false,
+                        message: format!("删除失败: {}", e),
+                        value: None,
+                    }),
+                }
+            }
+            Err(e) => Ok(RedisResponse {
+                success: false,
+                message: format!("获取连接失败: {}", e),
+                value: None,
+            }),
+        }
+    } else {
+        Ok(RedisResponse {
+            success: false,
+            message: "Redis 未连接".to_string(),
+            value: None,
+        })
+    }
+}
+
+// 新增命令：更新列表项
+#[tauri::command]
+pub async fn update_list_item(
+    connection_id: String,
+    key: String,
+    index: i64,
+    value: String,
+    state: State<'_, AppState>,
+) -> Result<RedisResponse, String> {
+    let connections = state.connections.lock().unwrap();
+
+    if let Some(conn_state) = connections.get(&connection_id) {
+        match conn_state.client.get_connection() {
+            Ok(mut conn) => {
+                // 获取列表长度
+                let len: i64 = match redis::cmd("LLEN").arg(&key).query(&mut conn) {
+                    Ok(len) => len,
+                    Err(e) => {
+                        return Ok(RedisResponse {
+                            success: false,
+                            message: format!("获取列表长度失败: {}", e),
+                            value: None,
+                        })
+                    }
+                };
+
+                // 验证索引是否在有效范围内
+                if index >= len || index < -len {
+                    return Ok(RedisResponse {
+                        success: false,
+                        message: format!("索引 {} 超出范围，列表长度为 {}", index, len),
+                        value: None,
+                    });
+                }
+
+                // 处理负索引
+                let effective_index = if index < 0 {
+                    // 将负索引转换为正索引
+                    len + index
+                } else {
+                    index
+                };
+
+                match redis::cmd("LSET")
+                    .arg(&key)
+                    .arg(effective_index)
+                    .arg(&value)
+                    .query::<()>(&mut conn)
+                {
+                    Ok(_) => Ok(RedisResponse {
+                        success: true,
+                        message: format!("成功更新 {} 的索引 {}", key, index),
+                        value: None,
+                    }),
+                    Err(e) => Ok(RedisResponse {
+                        success: false,
+                        message: format!("更新失败: {}", e),
+                        value: None,
+                    }),
+                }
+            }
+            Err(e) => Ok(RedisResponse {
+                success: false,
+                message: format!("获取连接失败: {}", e),
+                value: None,
+            }),
+        }
+    } else {
+        Ok(RedisResponse {
+            success: false,
+            message: "Redis 未连接".to_string(),
+            value: None,
+        })
+    }
+}
+
+// 新增命令：删除列表项
+#[tauri::command]
+pub async fn delete_list_item(
+    connection_id: String,
+    key: String,
+    value: String,
+    count: i64,
+    state: State<'_, AppState>,
+) -> Result<RedisResponse, String> {
+    let connections = state.connections.lock().unwrap();
+
+    if let Some(conn_state) = connections.get(&connection_id) {
+        match conn_state.client.get_connection() {
+            Ok(mut conn) => {
+                match redis::cmd("LREM")
+                    .arg(&key)
+                    .arg(count)
+                    .arg(&value)
+                    .query::<i64>(&mut conn)
+                {
+                    Ok(removed_count) => {
+                        if removed_count > 0 {
+                            Ok(RedisResponse {
+                                success: true,
+                                message: format!("成功删除 {} 个元素", removed_count),
+                                value: None,
+                            })
+                        } else {
+                            Ok(RedisResponse {
+                                success: false,
+                                message: "未找到匹配的元素".to_string(),
+                                value: None,
+                            })
+                        }
+                    }
+                    Err(e) => Ok(RedisResponse {
+                        success: false,
+                        message: format!("删除失败: {}", e),
+                        value: None,
+                    }),
+                }
+            }
+            Err(e) => Ok(RedisResponse {
+                success: false,
+                message: format!("获取连接失败: {}", e),
+                value: None,
+            }),
+        }
+    } else {
+        Ok(RedisResponse {
+            success: false,
+            message: "Redis 未连接".to_string(),
+            value: None,
+        })
+    }
+}
+
+// 新增命令：在列表末尾添加元素
+#[tauri::command]
+pub async fn append_list_item(
+    connection_id: String,
+    key: String,
+    value: String,
+    state: State<'_, AppState>,
+) -> Result<RedisResponse, String> {
+    let connections = state.connections.lock().unwrap();
+
+    if let Some(conn_state) = connections.get(&connection_id) {
+        match conn_state.client.get_connection() {
+            Ok(mut conn) => {
+                match redis::cmd("RPUSH")
+                    .arg(&key)
+                    .arg(&value)
+                    .query::<i64>(&mut conn)
+                {
+                    Ok(new_len) => Ok(RedisResponse {
+                        success: true,
+                        message: format!("成功在列表 {} 末尾添加元素，新长度: {}", key, new_len),
+                        value: None,
+                    }),
+                    Err(e) => Ok(RedisResponse {
+                        success: false,
+                        message: format!("添加失败: {}", e),
+                        value: None,
+                    }),
+                }
+            }
+            Err(e) => Ok(RedisResponse {
+                success: false,
+                message: format!("获取连接失败: {}", e),
+                value: None,
+            }),
+        }
+    } else {
+        Ok(RedisResponse {
+            success: false,
+            message: "Redis 未连接".to_string(),
+            value: None,
+        })
+    }
+}
+
+// 新增命令：添加Set元素
+#[tauri::command]
+pub async fn add_set_item(
+    connection_id: String,
+    key: String,
+    value: String,
+    state: State<'_, AppState>,
+) -> Result<RedisResponse, String> {
+    let connections = state.connections.lock().unwrap();
+
+    if let Some(conn_state) = connections.get(&connection_id) {
+        match conn_state.client.get_connection() {
+            Ok(mut conn) => {
+                match redis::cmd("SADD")
+                    .arg(&key)
+                    .arg(&value)
+                    .query::<i64>(&mut conn)
+                {
+                    Ok(count) => {
+                        if count > 0 {
+                            Ok(RedisResponse {
+                                success: true,
+                                message: format!("成功添加元素到集合 {}", key),
+                                value: None,
+                            })
+                        } else {
+                            Ok(RedisResponse {
+                                success: false,
+                                message: "元素已存在".to_string(),
+                                value: None,
+                            })
+                        }
+                    }
+                    Err(e) => Ok(RedisResponse {
+                        success: false,
+                        message: format!("添加失败: {}", e),
+                        value: None,
+                    }),
+                }
+            }
+            Err(e) => Ok(RedisResponse {
+                success: false,
+                message: format!("获取连接失败: {}", e),
+                value: None,
+            }),
+        }
+    } else {
+        Ok(RedisResponse {
+            success: false,
+            message: "Redis 未连接".to_string(),
+            value: None,
+        })
+    }
+}
+
+// 新增命令：删除Set元素
+#[tauri::command]
+pub async fn delete_set_item(
+    connection_id: String,
+    key: String,
+    value: String,
+    state: State<'_, AppState>,
+) -> Result<RedisResponse, String> {
+    let connections = state.connections.lock().unwrap();
+
+    if let Some(conn_state) = connections.get(&connection_id) {
+        match conn_state.client.get_connection() {
+            Ok(mut conn) => {
+                match redis::cmd("SREM")
+                    .arg(&key)
+                    .arg(&value)
+                    .query::<i64>(&mut conn)
+                {
+                    Ok(count) => {
+                        if count > 0 {
+                            Ok(RedisResponse {
+                                success: true,
+                                message: format!("成功从集合 {} 删除元素", key),
+                                value: None,
+                            })
+                        } else {
+                            Ok(RedisResponse {
+                                success: false,
+                                message: "元素不存在".to_string(),
+                                value: None,
+                            })
+                        }
+                    }
+                    Err(e) => Ok(RedisResponse {
+                        success: false,
+                        message: format!("删除失败: {}", e),
+                        value: None,
+                    }),
+                }
+            }
+            Err(e) => Ok(RedisResponse {
+                success: false,
+                message: format!("获取连接失败: {}", e),
+                value: None,
+            }),
+        }
+    } else {
+        Ok(RedisResponse {
+            success: false,
+            message: "Redis 未连接".to_string(),
+            value: None,
+        })
+    }
+}
+
+// 新增命令：添加ZSet元素
+#[tauri::command]
+pub async fn add_zset_item(
+    connection_id: String,
+    key: String,
+    score: f64,
+    value: String,
+    state: State<'_, AppState>,
+) -> Result<RedisResponse, String> {
+    let connections = state.connections.lock().unwrap();
+
+    if let Some(conn_state) = connections.get(&connection_id) {
+        match conn_state.client.get_connection() {
+            Ok(mut conn) => {
+                match redis::cmd("ZADD")
+                    .arg(&key)
+                    .arg(score)
+                    .arg(&value)
+                    .query::<i64>(&mut conn)
+                {
+                    Ok(count) => {
+                        if count > 0 {
+                            Ok(RedisResponse {
+                                success: true,
+                                message: format!("成功添加元素到有序集合 {}", key),
+                                value: None,
+                            })
+                        } else {
+                            Ok(RedisResponse {
+                                success: false,
+                                message: "元素已存在".to_string(),
+                                value: None,
+                            })
+                        }
+                    }
+                    Err(e) => Ok(RedisResponse {
+                        success: false,
+                        message: format!("添加失败: {}", e),
+                        value: None,
+                    }),
+                }
+            }
+            Err(e) => Ok(RedisResponse {
+                success: false,
+                message: format!("获取连接失败: {}", e),
+                value: None,
+            }),
+        }
+    } else {
+        Ok(RedisResponse {
+            success: false,
+            message: "Redis 未连接".to_string(),
+            value: None,
+        })
+    }
+}
+
+// 新增命令：删除ZSet元素
+#[tauri::command]
+pub async fn delete_zset_item(
+    connection_id: String,
+    key: String,
+    value: String,
+    state: State<'_, AppState>,
+) -> Result<RedisResponse, String> {
+    let connections = state.connections.lock().unwrap();
+
+    if let Some(conn_state) = connections.get(&connection_id) {
+        match conn_state.client.get_connection() {
+            Ok(mut conn) => {
+                match redis::cmd("ZREM")
+                    .arg(&key)
+                    .arg(&value)
+                    .query::<i64>(&mut conn)
+                {
+                    Ok(count) => {
+                        if count > 0 {
+                            Ok(RedisResponse {
+                                success: true,
+                                message: format!("成功从有序集合 {} 删除元素", key),
+                                value: None,
+                            })
+                        } else {
+                            Ok(RedisResponse {
+                                success: false,
+                                message: "元素不存在".to_string(),
+                                value: None,
+                            })
+                        }
+                    }
+                    Err(e) => Ok(RedisResponse {
+                        success: false,
+                        message: format!("删除失败: {}", e),
+                        value: None,
+                    }),
+                }
+            }
+            Err(e) => Ok(RedisResponse {
+                success: false,
+                message: format!("获取连接失败: {}", e),
+                value: None,
+            }),
+        }
+    } else {
+        Ok(RedisResponse {
+            success: false,
+            message: "Redis 未连接".to_string(),
+            value: None,
+        })
     }
 }
