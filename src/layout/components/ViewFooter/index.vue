@@ -1,17 +1,3 @@
-<script setup lang="ts">
-import ServerInfo from "@/module/ServerInfo/index.vue";
-
-const ServerInfoRef = ref();
-const openChange = (v) => {
-	console.log(v);
-	if (v) {
-		nextTick(() => {
-			ServerInfoRef.value.load();
-		});
-	}
-};
-</script>
-
 <template>
   <div class="view-footer h-[var(--view-footer-height)] bg-#fff">
     <div class="px-16px h-full flex items-center justify-between">

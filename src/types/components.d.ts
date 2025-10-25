@@ -43,13 +43,16 @@ declare module 'vue' {
     ATextarea: typeof import('ant-design-vue/es')['Textarea']
     ATooltip: typeof import('ant-design-vue/es')['Tooltip']
     AUpload: typeof import('ant-design-vue/es')['Upload']
+    CloseOutlined: typeof import('@ant-design/icons-vue')['CloseOutlined']
     DeleteOutlined: typeof import('@ant-design/icons-vue')['DeleteOutlined']
     DownOutlined: typeof import('@ant-design/icons-vue')['DownOutlined']
     IconButton: typeof import('./../components/IconButton/index.vue')['default']
     MenuItem: typeof import('./../components/MeuTabs/MenuItem.vue')['default']
     MeuTabs: typeof import('./../components/MeuTabs/index.vue')['default']
     PlusOutlined: typeof import('@ant-design/icons-vue')['PlusOutlined']
+    ReloadOutlined: typeof import('@ant-design/icons-vue')['ReloadOutlined']
     SearchOutlined: typeof import('@ant-design/icons-vue')['SearchOutlined']
     SwitcherOutlined: typeof import('@ant-design/icons-vue')['SwitcherOutlined']
+    VerticalAlignTopOutlined: typeof import('@ant-design/icons-vue')['VerticalAlignTopOutlined']
   }
 }

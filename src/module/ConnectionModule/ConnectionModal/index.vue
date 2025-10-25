@@ -63,7 +63,7 @@ let callback: ((formData: ConnectionFormState) => Promise<void> | void) | null =
 
 const use = (params: UseParams) => {
 	callback = params.onSuccess;
-	modalTitle.value = params.title;
+	modalTitle.value = params.title || '新建连接';
 
 	// 合并表单数据
 	formState.value = {

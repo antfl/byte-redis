@@ -269,7 +269,7 @@ const setTreeHeight = () => {
 
 <template>
   <div class="redis-key-container w-full flex flex-col">
-    <div class="redis-key-filter flex items-center">
+    <div class="redis-key-filter h-40px flex items-center">
       <div class="w-full">
         <a-input
           class="pr-0"
@@ -278,21 +278,29 @@ const setTreeHeight = () => {
           placeholder="搜索"
           allow-clear
         >
+          <template #clearIcon	>
+            <IconButton class="size-20px!">
+              <CloseOutlined class="font-size-11px color-#1e1e1e"/>
+            </IconButton>
+          </template>
           <template #prefix>
             <SearchOutlined/>
           </template>
           <template #suffix>
-            <IconButton @click="showAddKeyModal">
+            <IconButton class="size-24px!" @click="showAddKeyModal">
               <PlusOutlined class="font-size-16px"/>
             </IconButton>
           </template>
         </a-input>
       </div>
       <div class="pr-4px flex">
-        <IconButton>
+        <IconButton class="size-24px!">
+          <ReloadOutlined />
+        </IconButton>
+        <IconButton class="size-24px!">
           <ArrowUpOutlined/>
         </IconButton>
-        <IconButton>
+        <IconButton class="size-24px!">
           <ArrowDownOutlined/>
         </IconButton>
       </div>
