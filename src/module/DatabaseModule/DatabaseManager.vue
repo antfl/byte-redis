@@ -1,17 +1,19 @@
 <script setup lang="ts">
 import database from "@/assets/svg/database.svg";
 import downOutlined from "@/assets/svg/down-outlined.svg";
+import IconButton from "@/components/IconButton/index.vue";
+
 </script>
 
 <template>
   <a-dropdown class="ml-24px">
-    <div class="flex items-center">
+    <IconButton>
       <img class="size-24px" :src="database" alt="">
-      <a-tag class="mr-5px" :bordered="false">
+      <div class="mr-5px">
         DB01
-      </a-tag>
+      </div>
       <img class="size-10px" :src="downOutlined" alt="">
-    </div>
+    </IconButton>
     <template #overlay>
       <a-menu>
         <a-menu-item>
@@ -36,7 +38,3 @@ import downOutlined from "@/assets/svg/down-outlined.svg";
     </template>
   </a-dropdown>
 </template>
-
-<style scoped>
-
-</style>

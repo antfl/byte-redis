@@ -2,7 +2,7 @@
 import ConnectionModal from "@/module/ConnectionModule/ConnectionModal/index.vue";
 import downOutlined from "@/assets/svg/down-outlined.svg";
 import { Connection, useConnectionStore } from "@/stores/useConnectionStore.ts";
-import { computed } from "vue";
+import IconButton from "@/components/IconButton/index.vue";
 
 const connectionStore = useConnectionStore();
 
@@ -28,15 +28,15 @@ const activeConnection = computed(() => connectionStore.activeConnection);
 
 <template>
   <a-dropdown class="ml-24px" trigger="click">
-    <div class="flex items-center">
+    <IconButton class="flex items-center">
       <div class="leading-0px">
         <a-badge :status="isConnection ? 'success' : 'default'"/>
       </div>
-      <a-tag class="mr-5px" :bordered="false">
+      <div class="mr-5px">
         {{ activeConnection?.name || '新建连接' }}
-      </a-tag>
+      </div>
       <img class="size-10px" :src="downOutlined" alt="">
-    </div>
+    </IconButton>
     <template #overlay>
       <div>
         <a-menu>

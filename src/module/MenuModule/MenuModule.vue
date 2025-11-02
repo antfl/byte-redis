@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import menu from "@/assets/svg/menu.svg";
+import IconButton from "@/components/IconButton/index.vue"
 </script>
 
 <template>
-  <a-dropdown>
-    <img class="size-15px" :src="menu" alt="">
+  <a-dropdown trigger="click">
+    <IconButton class="size-28px!">
+      <img class="size-15px" :src="menu" alt="">
+    </IconButton>
     <template #overlay>
       <div>
         <a-menu>
@@ -22,7 +25,3 @@ import menu from "@/assets/svg/menu.svg";
     </template>
   </a-dropdown>
 </template>
-
-<style scoped>
-
-</style>

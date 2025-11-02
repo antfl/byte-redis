@@ -52,6 +52,7 @@ declare module 'vue' {
     PlusOutlined: typeof import('@ant-design/icons-vue')['PlusOutlined']
     ReloadOutlined: typeof import('@ant-design/icons-vue')['ReloadOutlined']
     SearchOutlined: typeof import('@ant-design/icons-vue')['SearchOutlined']
+    SwapOutlined: typeof import('@ant-design/icons-vue')['SwapOutlined']
     SwitcherOutlined: typeof import('@ant-design/icons-vue')['SwitcherOutlined']
     VerticalAlignTopOutlined: typeof import('@ant-design/icons-vue')['VerticalAlignTopOutlined']
   }

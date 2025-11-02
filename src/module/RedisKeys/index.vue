@@ -265,13 +265,16 @@ const setTreeHeight = () => {
 		}
 	});
 };
+
+const loadKeys = () => {
+  init(connectionStore.activeConnection as ConnectionConfig);
+}
 </script>
 
 <template>
   <div class="redis-key-container w-full flex flex-col">
     <div class="redis-key-filter h-40px flex items-center">
-      <div class="w-full">
-        <a-input
+      <a-input
           class="pr-0"
           :bordered="false"
           v-model:value="filterText"
@@ -287,23 +290,14 @@ const setTreeHeight = () => {
             <SearchOutlined/>
           </template>
           <template #suffix>
-            <IconButton class="size-24px!" @click="showAddKeyModal">
+            <IconButton placement="bottom" tooltip="新增" class="size-24px! mr-0!" @click="showAddKeyModal">
               <PlusOutlined class="font-size-16px"/>
+            </IconButton>
+            <IconButton placement="bottom" tooltip="刷新" class="size-24px! mr-4px" @click="loadKeys">
+              <ReloadOutlined />
             </IconButton>
           </template>
         </a-input>
-      </div>
-      <div class="pr-4px flex">
-        <IconButton class="size-24px!">
-          <ReloadOutlined />
-        </IconButton>
-        <IconButton class="size-24px!">
-          <ArrowUpOutlined/>
-        </IconButton>
-        <IconButton class="size-24px!">
-          <ArrowDownOutlined/>
-        </IconButton>
-      </div>
     </div>
 
     <div class="flex-1" ref="RedisKeyTreeRef">
@@ -328,7 +322,20 @@ const setTreeHeight = () => {
           </div>
         </template>
       </a-directory-tree>
-      <a-empty v-else-if="!isLoading" description="未找到键值数据"/>
+      <a-empty class="pt-20px" v-else-if="!isLoading" description="未找到键值数据"/>
+    </div>
+    <div class="keys-action px-8px h-40px flex items-center justify-between">
+      <IconButton class="size-24px!" tooltip="迁移数据" placement="top">
+        <SwapOutlined />
+      </IconButton>
+      <div class="flex">
+        <IconButton class="size-24px!" tooltip="导入" placement="top">
+          <ArrowUpOutlined/>
+        </IconButton>
+        <IconButton class="size-24px!" tooltip="导出" placement="top">
+          <ArrowDownOutlined/>
+        </IconButton>
+      </div>
     </div>
     <AddKeyModal ref="AddKeyModalRef"/>
   </div>
@@ -351,5 +358,8 @@ const setTreeHeight = () => {
   :deep(.anticon-file) {
     display: none;
   }
+}
+.keys-action {
+  border-top: 1px solid #f0f0f0;
 }
 </style>
