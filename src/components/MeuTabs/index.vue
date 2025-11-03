@@ -64,7 +64,7 @@ const handleItemClick = (
 </script>
 
 <template>
-  <div class="menu-tabs w-40px h-full py-5px bg-#fff flex justify-between flex-col">
+  <div class="menu-tabs w-40px h-full py-5px bg-[var(--color-bg-container)] flex justify-between flex-col">
     <a-space :size="10" align="center" direction="vertical">
       <MenuItem
         v-for="(item, index) in beforeList"

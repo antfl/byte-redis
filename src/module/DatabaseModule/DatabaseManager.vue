@@ -17,22 +17,16 @@ import IconButton from "@/components/IconButton/index.vue";
     <template #overlay>
       <a-menu>
         <a-menu-item>
-          <a-tag :bordered="false" color="#f5f5f5">
-            <span class="color-#1e1f22">DB01</span>
-          </a-tag>
-          <span class="ml-36px">11</span>
+          <span class="color-#1e1f22">DB01</span>
+          <span class="ml-8px">[11]</span>
         </a-menu-item>
         <a-menu-item>
-          <a-tag :bordered="false" color="#f5f5f5">
-            <span class="color-#1e1f22">DB02</span>
-          </a-tag>
-          <span class="ml-36px">112</span>
+          <span class="color-#1e1f22">DB02</span>
+          <span class="ml-8px">[112]</span>
         </a-menu-item>
         <a-menu-item>
-          <a-tag :bordered="false" color="#f5f5f5">
-            <span class="color-#1e1f22">DB03</span>
-          </a-tag>
-          <span class="ml-36px">121</span>
+          <span class="color-#1e1f22">DB03</span>
+          <span class="ml-8px">[121]</span>
         </a-menu-item>
       </a-menu>
     </template>

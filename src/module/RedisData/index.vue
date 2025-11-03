@@ -1,5 +1,5 @@
 <template>
-  <div class="w-full p-10px redis-key-detail-container bg-#fff">
+  <div class="w-full p-10px redis-key-detail-container bg-[var(--color-bg-container)]">
     <div class="header">
       <div>
         <div class="flex items-center">

@@ -76,10 +76,10 @@ const close = () => {
 };
 </script>
 
-<style scoped>
+<style scoped lang="less">
 .title-bar {
   height: var(--title-bar-height);
-  background-color: #fff;
+  background-color: var(--color-bg-container);
   user-select: none;
   display: flex;
   justify-content: space-between;
@@ -90,7 +90,7 @@ const close = () => {
   right: 0;
   z-index: 1000;
   overflow: hidden;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--color-border-secondary);
 }
 
 .app-info {

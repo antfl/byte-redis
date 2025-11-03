@@ -1,12 +1,11 @@
 <script setup>
 import zhCN from "ant-design-vue/es/locale/zh_CN";
 import Layout from "@/layout/Layout.vue";
+import { storeToRefs } from 'pinia';
 
-const themeConfig = {
-	token: {
-		borderRadius: 2,
-	},
-};
+import { useThemeStore } from '@/stores/theme';
+const themeStore = useThemeStore();
+const { themeConfig } = storeToRefs(themeStore);
 </script>
 
 <template>

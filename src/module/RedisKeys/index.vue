@@ -343,10 +343,10 @@ const loadKeys = () => {
 
 <style scoped lang="less">
 .redis-key-container {
-  border-right: 1px solid #f0f0f0;
+  border-right: 1px solid var(--color-border-secondary);
 
   .redis-key-filter {
-    border-bottom: 1px solid #f0f0f0;
+    border-bottom: 1px solid var(--color-border-secondary);
   }
 
   :deep(.ant-tree-switcher-noop) {
@@ -360,6 +360,7 @@ const loadKeys = () => {
   }
 }
 .keys-action {
-  border-top: 1px solid #f0f0f0;
+  border-top: 1px solid var(--color-border-secondary);
 }
+
 </style>

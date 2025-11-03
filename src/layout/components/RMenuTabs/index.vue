@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import {
-	BlockOutlined,
-	AppstoreOutlined,
-	PieChartOutlined,
+  BlockOutlined,
+  PieChartOutlined,
+  GithubOutlined,
 } from "@ant-design/icons-vue";
 import MenuTabs from "@/components/MeuTabs/index.vue";
 import { MenuItemProps } from "@/components/MeuTabs/types.ts";
+import {openUrl} from "@tauri-apps/plugin-opener";
 
 const menuList: MenuItemProps[] = [
 	{
@@ -18,28 +19,34 @@ const menuList: MenuItemProps[] = [
 		position: "before",
 		icon: PieChartOutlined,
 	},
-	{
-		id: 3,
-		position: "after",
-		icon: AppstoreOutlined,
-	},
+  {
+    id: 3,
+    tooltip: '源码地址',
+    position: "after",
+    icon: GithubOutlined,
+  },
 ];
 
-const activeAfter = ref();
 const activeBefore = ref();
+
+const handleClick = (item: MenuItemProps) => {
+  if(item.id === 3) {
+    openUrl('https://github.com/antfl/byte-redis')
+  }
+}
 </script>
 
 <template>
   <MenuTabs
+    @item-click="handleClick"
     class="right-menu-tabs"
     :menuList="menuList"
     v-model:before="activeBefore"
-    v-model:after="activeAfter
-"/>
+   />
 </template>
 
-<style scoped>
+<style scoped lang="less">
 .right-menu-tabs {
-  border-left: 1px solid #f0f0f0;
+  border-left: 1px solid var(--color-border-secondary);
 }
 </style>

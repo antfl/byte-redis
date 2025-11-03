@@ -1,7 +1,6 @@
 <script setup>
 import TitleBar from "@/layout/components/TitleBar/index.vue";
 import ViewFooter from "@/layout/components/ViewFooter/index.vue";
-import LMenuTabs from "@/layout/components/LMenuTabs/index.vue";
 import RMenuTabs from "@/layout/components/RMenuTabs/index.vue";
 
 import RedisKeys from "@/module/RedisKeys/index.vue";
@@ -16,7 +15,6 @@ import RedisData from "@/module/RedisData/index.vue";
     <a-layout class="h-[calc(100vh_-_var(--title-bar-height)_-_var(--view-footer-height))] overflow-hidden">
       <a-layout-sider theme="light" width="300">
         <div class="flex h-full overflow-hidden">
-          <LMenuTabs/>
           <RedisKeys/>
         </div>
       </a-layout-sider>
