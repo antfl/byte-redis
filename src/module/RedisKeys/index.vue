@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { invoke } from "@tauri-apps/api/core";
+import { storeToRefs } from "pinia";
 import { useConnectionStore } from "@/stores/useConnectionStore.ts";
 import AddKeyModal from "@/module/AddKeyModal/index.vue";
 import { message } from "ant-design-vue";
@@ -47,6 +48,7 @@ interface SetKeyResult {
 }
 
 const connectionStore = useConnectionStore();
+const { activeConnectionId, currentDbIndex, activeConnection } = storeToRefs(connectionStore);
 const filterText = ref("");
 const isLoading = ref(true);
 const fullTreeData = ref<TreeNode[]>([]);
@@ -81,14 +83,14 @@ const genData = computed(() => {
 });
 
 watch(
-	() => connectionStore.activeConnectionId,
+	activeConnectionId,
 	() => {
 		if (
-			connectionStore.activeConnection &&
-			connectionStore.activeConnectionId
+			activeConnection.value &&
+			activeConnectionId.value
 		) {
 			nextTick(() => {
-				init(connectionStore.activeConnection as ConnectionConfig);
+				init(activeConnection.value as ConnectionConfig);
 			});
 		}
 	},
@@ -97,23 +99,40 @@ watch(
 	},
 );
 
-const init = async (config: ConnectionConfig) => {
+watch(
+	currentDbIndex,
+	(newIndex, oldIndex) => {
+		if (
+			newIndex !== oldIndex &&
+			activeConnection.value &&
+			activeConnectionId.value
+		) {
+			nextTick(() => {
+				init(activeConnection.value as ConnectionConfig, true);
+			});
+		}
+	},
+);
+
+const init = async (config: ConnectionConfig, skipConnect = false) => {
 	if (!config) {
 		return;
 	}
 	isLoading.value = true;
 	fullTreeData.value = [];
 	try {
-		await invoke("connect_redis", {
-			config: {
-				name: config.name,
-				id: config.id,
-				host: config.host,
-				username: config.username,
-				password: config.password,
-				port: config.port,
-			},
-		});
+		if (!skipConnect) {
+			await invoke("connect_redis", {
+				config: {
+					name: config.name,
+					id: config.id,
+					host: config.host,
+					username: config.username,
+					password: config.password,
+					port: config.port,
+				},
+			});
+		}
 
 		const { keys } = await invoke<{ keys: KeyItem[] }>("get_keys", {
 			connectionId: config.id,
@@ -226,7 +245,7 @@ const showAddKeyModal = () => {
 				}
 
 				const result = await invoke<SetKeyResult>("set_key", {
-					connectionId: connectionStore.activeConnectionId,
+					connectionId: activeConnectionId.value,
 					key: data.key,
 					keyType: data.type,
 					value: value,
@@ -267,7 +286,9 @@ const setTreeHeight = () => {
 };
 
 const loadKeys = () => {
-  init(connectionStore.activeConnection as ConnectionConfig);
+  if (activeConnection.value) {
+    init(activeConnection.value as ConnectionConfig, true);
+  }
 }
 </script>
 

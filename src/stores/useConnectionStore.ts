@@ -15,6 +15,7 @@ export interface Connection {
 export const useConnectionStore = defineStore("connection", () => {
 	const connections: Ref<Connection[]> = ref([]);
 	const activeConnectionId: Ref<string | null> = ref(null);
+	const currentDbIndex: Ref<number> = ref(0);
 	const trigger: Ref<number> = ref(0);
 
 	const currentKey = ref();
@@ -81,6 +82,19 @@ export const useConnectionStore = defineStore("connection", () => {
 		}
 
 		activeConnectionId.value = id;
+		// 重置数据库索引为连接配置的默认数据库或 0
+		if (id) {
+			const conn = connections.value.find((c) => c.id === id);
+			currentDbIndex.value = conn?.db ?? 0;
+		} else {
+			currentDbIndex.value = 0;
+		}
+		trigger.value++;
+		saveToLocalStorage();
+	};
+
+	const setCurrentDbIndex = (dbIndex: number): void => {
+		currentDbIndex.value = dbIndex;
 		trigger.value++;
 		saveToLocalStorage();
 	};
@@ -99,6 +113,7 @@ export const useConnectionStore = defineStore("connection", () => {
 		const stateToSave = {
 			connections: connections.value,
 			activeConnectionId: activeConnectionId.value,
+			currentDbIndex: currentDbIndex.value,
 		};
 		localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
 	};
@@ -113,6 +128,9 @@ export const useConnectionStore = defineStore("connection", () => {
 				}
 				if (parsedData.activeConnectionId) {
 					activeConnectionId.value = parsedData.activeConnectionId;
+				}
+				if (parsedData.currentDbIndex !== undefined) {
+					currentDbIndex.value = parsedData.currentDbIndex;
 				}
 
 				if (
@@ -133,6 +151,7 @@ export const useConnectionStore = defineStore("connection", () => {
 		currentKey,
 		connections,
 		activeConnectionId,
+		currentDbIndex,
 		trigger,
 
 		activeConnection,
@@ -142,6 +161,7 @@ export const useConnectionStore = defineStore("connection", () => {
 		updateConnection,
 		deleteConnection,
 		setActiveConnection,
+		setCurrentDbIndex,
 		notify,
 
 		saveToLocalStorage,

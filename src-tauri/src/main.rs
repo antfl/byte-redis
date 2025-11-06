@@ -33,6 +33,7 @@ fn main() {
             commands::import_export::import_keys,
             commands::database::get_db_count,
             commands::database::get_db_key_count,
+            commands::database::get_all_db_key_counts,
             commands::database::select_db,
             commands::server::get_redis_server_info,
         ])

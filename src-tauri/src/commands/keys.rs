@@ -66,6 +66,15 @@ pub async fn set_key(
     if let Some(conn_state) = connections.get(&connection_id) {
         match conn_state.client.get_connection() {
             Ok(mut conn) => {
+                let current_db = conn_state.current_db;
+                if let Err(e) = redis::cmd("SELECT").arg(current_db).query::<()>(&mut conn) {
+                    return Ok(RedisResponse {
+                        success: false,
+                        message: format!("切换到数据库 {} 失败: {}", current_db, e),
+                        value: None,
+                    });
+                }
+
                 let result = if ttl > 0 {
                     redis::cmd("SETEX")
                         .arg(&key)
@@ -119,6 +128,15 @@ pub async fn get_key(
     if let Some(conn_state) = connections.get(&connection_id) {
         match conn_state.client.get_connection() {
             Ok(mut conn) => {
+                let current_db = conn_state.current_db;
+                if let Err(e) = redis::cmd("SELECT").arg(current_db).query::<()>(&mut conn) {
+                    return Ok(RedisResponse {
+                        success: false,
+                        message: format!("切换到数据库 {} 失败: {}", current_db, e),
+                        value: None,
+                    });
+                }
+
                 // 使用 Option<String> 处理 nil 响应
                 match redis::cmd("GET").arg(&key).query::<Option<String>>(&mut conn) {
                     Ok(Some(value)) => Ok(RedisResponse {
@@ -166,6 +184,16 @@ pub async fn get_keys(
     if let Some(conn_state) = connections.get(&connection_id) {
         match conn_state.client.get_connection() {
             Ok(mut conn) => {
+                let current_db = conn_state.current_db;
+                if let Err(e) = redis::cmd("SELECT").arg(current_db).query::<()>(&mut conn) {
+                    return Ok(KeysResponse {
+                        success: false,
+                        message: format!("切换到数据库 {} 失败: {}", current_db, e),
+                        keys: None,
+                        total: 0,
+                    });
+                }
+
                 // 使用 SCAN 命令分批获取键名
                 let mut keys_with_info = Vec::new();
                 let mut cursor: u64 = 0;
@@ -273,6 +301,15 @@ pub async fn get_key_detail(
     if let Some(conn_state) = connections.get(&connection_id) {
         match conn_state.client.get_connection() {
             Ok(mut conn) => {
+                let current_db = conn_state.current_db;
+                if let Err(e) = redis::cmd("SELECT").arg(current_db).query::<()>(&mut conn) {
+                    return Ok(KeyDetailResponse {
+                        success: false,
+                        message: format!("切换到数据库 {} 失败: {}", current_db, e),
+                        detail: None,
+                    });
+                }
+
                 // 检查键是否存在
                 let exists: bool = match redis::cmd("EXISTS").arg(&key).query(&mut conn) {
                     Ok(exists) => exists,
