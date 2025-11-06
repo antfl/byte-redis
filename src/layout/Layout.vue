@@ -4,7 +4,7 @@ import ViewFooter from "@/layout/components/ViewFooter/index.vue";
 import RMenuTabs from "@/layout/components/RMenuTabs/index.vue";
 
 import RedisKeys from "@/module/RedisKeys/index.vue";
-import RedisData from "@/module/RedisData/index.vue";
+const route = useRoute();
 </script>
 
 <template>
@@ -13,14 +13,14 @@ import RedisData from "@/module/RedisData/index.vue";
       <TitleBar/>
     </a-layout-header>
     <a-layout class="h-[calc(100vh_-_var(--title-bar-height)_-_var(--view-footer-height))] overflow-hidden">
-      <a-layout-sider theme="light" width="300">
+      <a-layout-sider v-if="route.path === '/data'" theme="light" width="300">
         <div class="flex h-full overflow-hidden">
           <RedisKeys/>
         </div>
       </a-layout-sider>
       <a-layout-content>
         <div class="flex h-full justify-between overflow-hidden">
-          <RedisData/>
+          <router-view/>
           <RMenuTabs/>
         </div>
       </a-layout-content>

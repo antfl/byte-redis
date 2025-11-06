@@ -7,6 +7,8 @@ import {
 import MenuTabs from "@/components/MeuTabs/index.vue";
 import { MenuItemProps } from "@/components/MeuTabs/types.ts";
 import {openUrl} from "@tauri-apps/plugin-opener";
+const router = useRouter();
+const route = useRoute();
 
 const menuList: MenuItemProps[] = [
 	{
@@ -32,8 +34,19 @@ const activeBefore = ref();
 const handleClick = (item: MenuItemProps) => {
   if(item.id === 3) {
     openUrl('https://github.com/antfl/byte-redis')
+    return;
   }
+  if(item.id === 1) router.push('/data')
+  if(item.id === 2) router.push('/stats')
 }
+
+watch(
+  () => route.path,
+  (p) => {
+    activeBefore.value = p === '/stats' ? 2 : 1;
+  },
+  { immediate: true }
+)
 </script>
 
 <template>
