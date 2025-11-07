@@ -6,7 +6,7 @@
       </div>
 
       <!-- 菜单模块 -->
-      <MenuModule/>
+      <Menu/>
 
       <!-- 连接管理 -->
       <ConnectionManager/>
@@ -39,9 +39,9 @@ import {
 } from "@ant-design/icons-vue";
 import Logo from "@/assets/images/logo.jpg";
 import Restore from "@/assets/svg/restore.svg";
-import ConnectionManager from "@/module/ConnectionModule/ConnectionManager.vue";
-import DatabaseManager from "@/module/DatabaseModule/DatabaseManager.vue";
-import MenuModule from "@/module/MenuModule/MenuModule.vue";
+import ConnectionManager from "@/module/Connection/ConnectionManager.vue";
+import DatabaseManager from "@/module/Database/DatabaseManager.vue";
+import Menu from "@/module/Menu/Menu.vue";
 
 const appName = import.meta.env.VITE_APP_NAME;
 

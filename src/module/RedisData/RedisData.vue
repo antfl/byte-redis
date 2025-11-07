@@ -53,7 +53,7 @@
     </div>
 
     <a-modal
-      v-model:visible="editModalVisible"
+      v-model:open="editModalVisible"
       title="修改Key名称"
       @ok="handleRenameKey"
       @cancel="editModalVisible = false"
@@ -66,7 +66,7 @@
     </a-modal>
 
     <a-modal
-      v-model:visible="ttlModalVisible"
+      v-model:open="ttlModalVisible"
       title="修改过期时间"
       @ok="handleUpdateTTL"
       @cancel="ttlModalVisible = false"
@@ -86,9 +86,10 @@
 </template>
 
 <script setup lang="ts">
+import { ref, reactive, watch } from 'vue';
 import { message, Modal } from "ant-design-vue";
-import { invoke } from "@tauri-apps/api/core";
 import { useConnectionStore } from "@/stores/useConnectionStore.ts";
+import { renameKey, setKeyTtl, deleteKey, setKey, getKeyDetail } from "@/api";
 import { useClipboard } from "@vueuse/core";
 import IconButton from "@/components/IconButton/index.vue";
 import StringEditor from "./components/StringEditor.vue";
@@ -96,8 +97,7 @@ import HashEditor from "./components/HashEditor.vue";
 import ListEditor from "./components/ListEditor.vue";
 import SetEditor from "./components/SetEditor.vue";
 import ZSetEditor from "./components/ZSetEditor.vue";
-
-import { EditOutlined, DeleteOutlined, FieldTimeOutlined } from "@ant-design/icons-vue";
+import { EditOutlined, DeleteOutlined, FieldTimeOutlined, SwitcherOutlined } from "@ant-design/icons-vue";
 
 interface RedisKey {
 	key: string;
@@ -107,9 +107,6 @@ interface RedisKey {
 	value: any;
 }
 
-interface KeyDetailResponse {
-	detail: RedisKey;
-}
 
 const connectionStore = useConnectionStore();
 const keyData = reactive<RedisKey>({
@@ -131,12 +128,16 @@ const loadKeyDetail = async () => {
 		return;
 
 	try {
-		const res = await invoke<KeyDetailResponse>("get_key_detail", {
-			connectionId: connectionStore.activeConnection.id,
-			key: connectionStore.currentKey,
-		});
+		const res = await getKeyDetail(
+			connectionStore.activeConnection.id,
+			connectionStore.currentKey,
+		);
 
-		Object.assign(keyData, res.detail);
+		if (res.success && res.data) {
+			Object.assign(keyData, res.data);
+		} else {
+			message.error(res.message || "获取键详情失败");
+		}
 	} catch (error) {
 		message.error(`获取键详情失败: ${error}`);
 	}
@@ -198,16 +199,27 @@ const handleRenameKey = async () => {
 	}
 
 	try {
-		await invoke("rename_key", {
-			connectionId: connectionStore?.activeConnection?.id,
-			oldKey: keyData.key,
-			newKey: newKeyName.value,
-		});
+		if (!connectionStore?.activeConnection?.id) {
+			message.error("未选择连接");
+			return;
+		}
+		
+		const res = await renameKey(
+			connectionStore.activeConnection.id,
+			keyData.key,
+			newKeyName.value,
+		);
 
-		keyData.key = newKeyName.value;
-		connectionStore.currentKey = newKeyName.value;
-		message.success("Key名称已更新");
-		editModalVisible.value = false;
+		if (res.success) {
+			keyData.key = newKeyName.value;
+			connectionStore.currentKey = newKeyName.value;
+			// 刷新左侧 key 列表
+			connectionStore.refreshKeyList();
+			message.success(res.message || "Key名称已更新");
+			editModalVisible.value = false;
+		} else {
+			message.error(res.message || "重命名失败");
+		}
 	} catch (error) {
 		message.error(`重命名失败: ${error}`);
 	}
@@ -217,15 +229,24 @@ const handleUpdateTTL = async () => {
 	const ttlValue = setPersistent.value ? -1 : newTTL.value;
 
 	try {
-		await invoke("set_key_ttl", {
-			connectionId: connectionStore?.activeConnection?.id,
-			key: keyData.key,
-			ttl: ttlValue,
-		});
+		if (!connectionStore?.activeConnection?.id) {
+			message.error("未选择连接");
+			return;
+		}
+		
+		const res = await setKeyTtl(
+			connectionStore.activeConnection.id,
+			keyData.key,
+			ttlValue,
+		);
 
-		keyData.ttl = ttlValue;
-		message.success("TTL已更新");
-		ttlModalVisible.value = false;
+		if (res.success) {
+			keyData.ttl = ttlValue;
+			message.success(res.message || "TTL已更新");
+			ttlModalVisible.value = false;
+		} else {
+			message.error(res.message || "更新TTL失败");
+		}
 	} catch (error) {
 		message.error(`更新TTL失败: ${error}`);
 	}
@@ -233,13 +254,24 @@ const handleUpdateTTL = async () => {
 
 const handleDeleteKey = async () => {
 	try {
-		await invoke("delete_key", {
-			connectionId: connectionStore?.activeConnection?.id,
-			key: keyData.key,
-		});
+		if (!connectionStore?.activeConnection?.id) {
+			message.error("未选择连接");
+			return;
+		}
+		
+		const res = await deleteKey(
+			connectionStore.activeConnection.id,
+			keyData.key,
+		);
 
-		message.success(`Key "${keyData.key}" 已删除`);
-		connectionStore.currentKey = null;
+		if (res.success) {
+			message.success(res.message || `Key "${keyData.key}" 已删除`);
+			connectionStore.currentKey = null;
+			// 刷新左侧 key 列表
+			connectionStore.refreshKeyList();
+		} else {
+			message.error(res.message || "删除失败");
+		}
 	} catch (error) {
 		message.error(`删除失败: ${error}`);
 	}
@@ -253,12 +285,18 @@ const saveChanges = async () => {
 
 	try {
 		if (keyData.type === "string") {
-			await invoke("set_key", {
-				connectionId: connectionStore.activeConnection.id,
-				key: keyData.key,
-				value: keyData.value,
-				ttl: keyData.ttl > 0 ? keyData.ttl : 0,
-			});
+			const res = await setKey(
+				connectionStore.activeConnection.id,
+				keyData.key,
+				"string",
+				keyData.value,
+				keyData.ttl > 0 ? keyData.ttl : 0,
+			);
+			if (res.success) {
+				message.success(res.message || "保存成功");
+			} else {
+				message.error(res.message || "保存失败");
+			}
 		} else if (keyData.type === "hash") {
 			message.info("哈希类型修改已通过字段操作完成");
 		} else if (keyData.type === "list") {
@@ -304,3 +342,4 @@ const refreshData = async () => {
   border-top: 1px solid #f0f0f0;
 }
 </style>
+

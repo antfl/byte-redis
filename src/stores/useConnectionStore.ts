@@ -17,6 +17,7 @@ export const useConnectionStore = defineStore("connection", () => {
 	const activeConnectionId: Ref<string | null> = ref(null);
 	const currentDbIndex: Ref<number> = ref(0);
 	const trigger: Ref<number> = ref(0);
+	const keyListRefreshTrigger: Ref<number> = ref(0);
 
 	const currentKey = ref();
 
@@ -103,6 +104,10 @@ export const useConnectionStore = defineStore("connection", () => {
 		trigger.value++;
 	};
 
+	const refreshKeyList = (): void => {
+		keyListRefreshTrigger.value++;
+	};
+
 	const generateUniqueId = (): string => {
 		return Date.now().toString(36) + Math.random().toString(36).substring(2);
 	};
@@ -153,6 +158,7 @@ export const useConnectionStore = defineStore("connection", () => {
 		activeConnectionId,
 		currentDbIndex,
 		trigger,
+		keyListRefreshTrigger,
 
 		activeConnection,
 		connectionCount,
@@ -163,6 +169,7 @@ export const useConnectionStore = defineStore("connection", () => {
 		setActiveConnection,
 		setCurrentDbIndex,
 		notify,
+		refreshKeyList,
 
 		saveToLocalStorage,
 		loadFromLocalStorage,

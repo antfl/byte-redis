@@ -1,19 +1,10 @@
 use crate::state::AppState;
+use crate::commands::response::Response;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tauri::State;
-use chrono::{DateTime, Utc, TimeZone};
-use redis::{self, Commands, Connection};
-use std::sync::{Arc, Mutex};
-
-// 定义响应结构体
-#[derive(Debug, Serialize)]
-pub struct RedisResponse {
-    pub success: bool,
-    pub message: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub value: Option<String>,
-}
+use chrono::{Utc, TimeZone};
+use redis::Connection;
 
 // 键详情结构体
 #[derive(Debug, Serialize, Deserialize)]
@@ -33,18 +24,21 @@ pub async fn export_key(
     connection_id: String,
     key: String,
     state: State<'_, AppState>,
-) -> Result<KeyDetail, String> {
+) -> Result<Response<KeyDetail>, String> {
     let connections = state.connections.lock().unwrap();
 
     if let Some(conn_state) = connections.get(&connection_id) {
         match conn_state.client.get_connection() {
             Ok(mut conn) => {
-                get_key_detail_internal(&mut conn, &key)
+                match get_key_detail_internal(&mut conn, &key) {
+                    Ok(detail) => Ok(Response::success(detail)),
+                    Err(e) => Ok(Response::error(e)),
+                }
             }
-            Err(e) => Err(format!("获取连接失败: {}", e)),
+            Err(e) => Ok(Response::error(format!("获取连接失败: {}", e))),
         }
     } else {
-        Err("Redis 未连接".to_string())
+        Ok(Response::error("Redis 未连接".to_string()))
     }
 }
 
@@ -54,7 +48,7 @@ pub async fn export_keys(
     connection_id: String,
     pattern: String,
     state: State<'_, AppState>,
-) -> Result<Vec<KeyDetail>, String> {
+) -> Result<Response<Vec<KeyDetail>>, String> {
     let connections = state.connections.lock().unwrap();
 
     if let Some(conn_state) = connections.get(&connection_id) {
@@ -74,12 +68,12 @@ pub async fn export_keys(
                         Err(e) => eprintln!("导出键 {} 失败: {}", key, e),
                     }
                 }
-                Ok(exported_keys)
+                Ok(Response::success(exported_keys))
             }
-            Err(e) => Err(format!("获取连接失败: {}", e)),
+            Err(e) => Ok(Response::error(format!("获取连接失败: {}", e))),
         }
     } else {
-        Err("Redis 未连接".to_string())
+        Ok(Response::error("Redis 未连接".to_string()))
     }
 }
 
@@ -211,7 +205,7 @@ pub async fn import_key(
     key_detail: KeyDetail,
     overwrite: bool,
     state: State<'_, AppState>,
-) -> Result<RedisResponse, String> {
+) -> Result<Response<()>, String> {
     let connections = state.connections.lock().unwrap();
 
     if let Some(conn_state) = connections.get(&connection_id) {
@@ -224,11 +218,7 @@ pub async fn import_key(
                     .map_err(|e| format!("检查键存在失败: {}", e))?;
 
                 if exists && !overwrite {
-                    return Ok(RedisResponse {
-                        success: false,
-                        message: format!("键 {} 已存在，跳过导入", key_detail.key),
-                        value: None,
-                    });
+                    return Ok(Response::error(format!("键 {} 已存在，跳过导入", key_detail.key)));
                 }
 
                 // 如果存在且需要覆盖，先删除旧键
@@ -353,16 +343,12 @@ pub async fn import_key(
                     }
                 }
 
-                Ok(RedisResponse {
-                    success: true,
-                    message: format!("成功导入键 {}", key_detail.key),
-                    value: None,
-                })
+                Ok(Response::<()>::success_empty_with_message(format!("成功导入键 {}", key_detail.key)))
             }
-            Err(e) => Err(format!("获取连接失败: {}", e)),
+            Err(e) => Ok(Response::error(format!("获取连接失败: {}", e))),
         }
     } else {
-        Err("Redis 未连接".to_string())
+        Ok(Response::error("Redis 未连接".to_string()))
     }
 }
 
@@ -373,7 +359,7 @@ pub async fn import_keys(
     keys: Vec<KeyDetail>,
     overwrite: bool,
     state: State<'_, AppState>,
-) -> Result<RedisResponse, String> {
+) -> Result<Response<()>, String> {
     let mut success_count = 0;
     let mut error_count = 0;
     let mut errors = Vec::new();
@@ -624,9 +610,9 @@ pub async fn import_keys(
         )
     };
 
-    Ok(RedisResponse {
-        success: error_count == 0,
-        message,
-        value: None,
-    })
+    if error_count == 0 {
+        Ok(Response::<()>::success_empty_with_message(message))
+    } else {
+        Ok(Response::error(message))
+    }
 }

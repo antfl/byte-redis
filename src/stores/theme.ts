@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia';
+import { computed, watch } from 'vue';
 import { theme } from 'ant-design-vue';
 import type { ThemeConfig } from 'ant-design-vue/es/config-provider/context';
 import { useDebounceFn, useLocalStorage, usePreferredDark } from '@vueuse/core';
@@ -8,7 +9,7 @@ const { defaultAlgorithm, darkAlgorithm, defaultSeed } = theme;
 
 export const useThemeStore = defineStore('theme', () => {
   // 持久化主题模式（支持 light、dark、auto）
-  const themeMode = useLocalStorage<ThemeMode>('theme-mode', config.themeMode);
+  const themeMode = useLocalStorage<ThemeMode>('theme-mode', config.themeMode as ThemeMode);
 
   // 持久化主色调
   const primaryColor = useLocalStorage('primary-color', config.themeColor);
@@ -21,7 +22,7 @@ export const useThemeStore = defineStore('theme', () => {
     if (themeMode.value === 'auto') {
       return prefersDark.value ? 'dark' : 'light';
     }
-    return themeMode.value;
+    return themeMode.value as 'light' | 'dark';
   });
 
   // 计算主题配置
@@ -78,7 +79,7 @@ export const useThemeStore = defineStore('theme', () => {
     }
 
     // 循环切换
-    const modes = ['light', 'dark', 'auto'] as const;
+    const modes: ThemeMode[] = ['light', 'dark', 'auto'];
     const currentIndex = modes.indexOf(themeMode.value);
     themeMode.value = modes[(currentIndex + 1) % modes.length];
   };
@@ -108,9 +109,9 @@ export const useThemeStore = defineStore('theme', () => {
 
   return {
     themeChange,
-    themeMode: themeMode as ComputedRef<ThemeMode>,
-    currentTheme: currentTheme as ComputedRef<'light' | 'dark'>,
-    primaryColor: primaryColor as ComputedRef<string>,
+    themeMode,
+    currentTheme,
+    primaryColor,
     themeConfig,
     toggleTheme,
     setPrimaryColor,

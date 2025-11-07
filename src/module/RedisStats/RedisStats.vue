@@ -35,13 +35,14 @@
 </template>
 
 <script setup lang="ts">
+import { ref, reactive, onMounted, onBeforeUnmount } from 'vue';
 import * as echarts from 'echarts/core';
 import { LineChart, BarChart } from 'echarts/charts';
 import { GridComponent, TooltipComponent, LegendComponent, TitleComponent } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
-import { invoke } from "@tauri-apps/api/core";
 import { message } from 'ant-design-vue';
 import { useConnectionStore } from "@/stores/useConnectionStore.ts";
+import { getRedisServerInfo, getDbCount, getDbKeyCount } from "@/api";
 
 echarts.use([LineChart, BarChart, GridComponent, TooltipComponent, LegendComponent, TitleComponent, CanvasRenderer]);
 
@@ -109,10 +110,13 @@ const updateCharts = () => {
 const poll = async () => {
   try {
     if (!connectionStore.activeConnection?.id) return;
-    const info = await invoke<Record<string, any>>("get_redis_server_info", {
-      connectionId: connectionStore.activeConnection.id,
-    });
-    Object.assign(serverInfo, info || {});
+    
+    const infoRes = await getRedisServerInfo(connectionStore.activeConnection.id);
+    if (!infoRes.success || !infoRes.data) {
+      message.error(infoRes.message || "获取服务器信息失败");
+      return;
+    }
+    Object.assign(serverInfo, infoRes.data);
 
     const ops = Number(serverInfo.ops_per_sec ?? 0);
     const now = new Date();
@@ -124,11 +128,19 @@ const poll = async () => {
       opsData.value.shift();
     }
 
-    const dbCount: number = await invoke("get_db_count", { connectionId: connectionStore.activeConnection.id });
+    const dbCountRes = await getDbCount(connectionStore.activeConnection.id);
+    if (!dbCountRes.success || dbCountRes.data === undefined) {
+      message.error(dbCountRes.message || "获取数据库数量失败");
+      return;
+    }
+    const dbCount = dbCountRes.data;
+    
     const series: { name: string; value: number }[] = [];
     for (let i = 0; i < dbCount; i++) {
-      const count: number = await invoke("get_db_key_count", { connectionId: connectionStore.activeConnection.id, dbIndex: i });
-      series.push({ name: `db${i}`, value: count });
+      const countRes = await getDbKeyCount(connectionStore.activeConnection.id, i);
+      if (countRes.success && countRes.data !== undefined) {
+        series.push({ name: `db${i}`, value: countRes.data });
+      }
     }
     dbSeries.value = series;
 
@@ -157,3 +169,4 @@ const resize = () => {
   dbChart?.resize();
 }
 </script>
+

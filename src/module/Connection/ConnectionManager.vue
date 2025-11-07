@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import ConnectionModal from "@/module/ConnectionModule/ConnectionModal/index.vue";
+import { ref, computed } from 'vue';
+import { PlusOutlined } from '@ant-design/icons-vue';
+import ConnectionModal from "@/module/Connection/ConnectionModal.vue";
 import downOutlined from "@/assets/svg/down-outlined.svg";
 import { Connection, useConnectionStore } from "@/stores/useConnectionStore.ts";
 import IconButton from "@/components/IconButton/index.vue";
@@ -14,7 +16,7 @@ const onClick = (item: Connection) => {
 
 const ConnectionModalRef = ref();
 const newConnection = () => {
-	ConnectionModalRef.value.use({
+	ConnectionModalRef.value.open({
 		onSuccess: (data: Connection) => {
 			connectionStore.createConnection(data);
 		},
@@ -54,3 +56,4 @@ const activeConnection = computed(() => connectionStore.activeConnection);
 
   <ConnectionModal ref="ConnectionModalRef"/>
 </template>
+

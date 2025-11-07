@@ -21,10 +21,10 @@
       </a-button>
     </div>
 
-    <a-modal v-model:visible="zsetItemModalVisible" :title="zsetItemModalTitle" @ok="handleZSetItemOperation" @cancel="closeZSetItemModal">
+    <a-modal v-model:open="zsetItemModalVisible" :title="zsetItemModalTitle" @ok="handleZSetItemOperation" @cancel="closeZSetItemModal">
       <a-form layout="vertical">
-        <a-form-item label="分数">
-          <a-input-number v-model:value="zsetItem.score" :min="0" style="width: 100%" />
+        <a-form-item label="分数 (Score)" :help="'用于排序，分数越小越靠前。可以是任意浮点数（包括负数）'">
+          <a-input-number v-model:value="zsetItem.score" :precision="2" style="width: 100%" />
         </a-form-item>
         <a-form-item label="元素值">
           <a-input v-model:value="zsetItem.value" />
@@ -37,13 +37,13 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from "vue";
 import { message, Modal } from "ant-design-vue";
-import { invoke } from "@tauri-apps/api/core";
 import {
 	EditOutlined,
 	DeleteOutlined,
 	PlusOutlined,
 } from "@ant-design/icons-vue";
 import { useConnectionStore } from "@/stores/useConnectionStore.ts";
+import { addZSetItem, deleteZSetItem as deleteZSetItemApi } from "@/api";
 
 interface RedisKey {
 	key: string;
@@ -100,38 +100,55 @@ const handleZSetItemOperation = async () => {
 	}
 
 	try {
-		if (zsetItem.originalValue) {
-			await invoke("delete_zset_item", {
-				connectionId: connectionStore?.activeConnection?.id,
-				key: props.keyData.key,
-				value: zsetItem.originalValue,
-			});
-
-			await invoke("add_zset_item", {
-				connectionId: connectionStore?.activeConnection?.id,
-				key: props.keyData.key,
-				score: zsetItem.score,
-				value: zsetItem.value,
-			});
-
-			const index = props.keyData.value.findIndex((item: any) => item.value === zsetItem.originalValue);
-			if (index !== -1) {
-				props.keyData.value[index] = { score: zsetItem.score, value: zsetItem.value };
-			}
-			message.success("元素已更新");
-		} else {
-			await invoke("add_zset_item", {
-				connectionId: connectionStore?.activeConnection?.id,
-				key: props.keyData.key,
-				score: zsetItem.score,
-				value: zsetItem.value,
-			});
-
-			props.keyData.value.push({ score: zsetItem.score, value: zsetItem.value });
-			message.success("元素已添加");
+		if (!connectionStore?.activeConnection?.id) {
+			message.error("未选择连接");
+			return;
 		}
 
-		zsetItemModalVisible.value = false;
+		if (zsetItem.originalValue) {
+			// 先删除旧值，再添加新值
+			const deleteRes = await deleteZSetItemApi(
+				connectionStore.activeConnection.id,
+				props.keyData.key,
+				zsetItem.originalValue,
+			);
+			if (!deleteRes.success) {
+				message.error(deleteRes.message || "删除旧值失败");
+				return;
+			}
+
+			const addRes = await addZSetItem(
+				connectionStore.activeConnection.id,
+				props.keyData.key,
+				zsetItem.score,
+				zsetItem.value,
+			);
+			if (addRes.success) {
+				const index = props.keyData.value.findIndex((item: any) => item.value === zsetItem.originalValue);
+				if (index !== -1) {
+					props.keyData.value[index] = { score: zsetItem.score, value: zsetItem.value };
+				}
+				message.success(addRes.message || "元素已更新");
+				zsetItemModalVisible.value = false;
+			} else {
+				message.error(addRes.message || "添加新值失败");
+			}
+		} else {
+			const res = await addZSetItem(
+				connectionStore.activeConnection.id,
+				props.keyData.key,
+				zsetItem.score,
+				zsetItem.value,
+			);
+
+			if (res.success) {
+				props.keyData.value.push({ score: zsetItem.score, value: zsetItem.value });
+				message.success(res.message || "元素已添加");
+				zsetItemModalVisible.value = false;
+			} else {
+				message.error(res.message || "添加失败");
+			}
+		}
 	} catch (error) {
 		message.error(`操作失败: ${error}`);
 	}
@@ -146,14 +163,23 @@ const deleteZSetItem = (value: string) => {
 		cancelText: "取消",
 		async onOk() {
 			try {
-				await invoke("delete_zset_item", {
-					connectionId: connectionStore?.activeConnection?.id,
-					key: props.keyData.key,
-					value,
-				});
+				if (!connectionStore?.activeConnection?.id) {
+					message.error("未选择连接");
+					return;
+				}
 
-				props.keyData.value = props.keyData.value.filter((item: any) => item.value !== value);
-				message.success("元素已删除");
+				const res = await deleteZSetItemApi(
+					connectionStore.activeConnection.id,
+					props.keyData.key,
+					value,
+				);
+
+				if (res.success) {
+					props.keyData.value = props.keyData.value.filter((item: any) => item.value !== value);
+					message.success(res.message || "元素已删除");
+				} else {
+					message.error(res.message || "删除失败");
+				}
 			} catch (error) {
 				message.error(`删除失败: ${error}`);
 			}

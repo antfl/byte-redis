@@ -3,7 +3,7 @@ import TitleBar from "@/layout/components/TitleBar/index.vue";
 import ViewFooter from "@/layout/components/ViewFooter/index.vue";
 import RMenuTabs from "@/layout/components/RMenuTabs/index.vue";
 
-import RedisKeys from "@/module/RedisKeys/index.vue";
+import RedisKeys from "@/module/RedisKeys/RedisKeys.vue";
 const route = useRoute();
 </script>
 

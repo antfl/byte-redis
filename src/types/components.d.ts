@@ -58,6 +58,8 @@ declare module 'vue' {
     MeuTabs: typeof import('./../components/MeuTabs/index.vue')['default']
     PlusOutlined: typeof import('@ant-design/icons-vue')['PlusOutlined']
     ReloadOutlined: typeof import('@ant-design/icons-vue')['ReloadOutlined']
+    RouterLink: typeof import('vue-router')['RouterLink']
+    RouterView: typeof import('vue-router')['RouterView']
     SearchOutlined: typeof import('@ant-design/icons-vue')['SearchOutlined']
     SettingOutlined: typeof import('@ant-design/icons-vue')['SettingOutlined']
     SwapOutlined: typeof import('@ant-design/icons-vue')['SwapOutlined']

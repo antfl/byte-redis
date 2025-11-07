@@ -1,22 +1,14 @@
 use crate::state::{AppState, ConnectionState, RedisConnectionConfig};
+use crate::commands::response::Response;
 use redis::Client;
 use tauri::State;
-
-// 通用响应结构体
-#[derive(Debug, serde::Serialize)]
-pub struct RedisResponse {
-    pub success: bool,
-    pub message: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub value: Option<String>,
-}
 
 // 连接 Redis 命令
 #[tauri::command]
 pub async fn connect_redis(
     config: RedisConnectionConfig,
     state: State<'_, AppState>,
-) -> Result<RedisResponse, String> {
+) -> Result<Response<()>, String> {
     // 构建连接 URL
     let url = if let (Some(username), Some(password)) = (config.username.clone(), config.password.clone()) {
         format!("redis://{}:{}@{}:{}/{}",
@@ -32,11 +24,7 @@ pub async fn connect_redis(
     let client = match Client::open(url) {
         Ok(c) => c,
         Err(e) => {
-            return Ok(RedisResponse {
-                success: false,
-                message: format!("客户端创建失败: {}", e),
-                value: None,
-            })
+            return Ok(Response::error(format!("客户端创建失败: {}", e)))
         }
     };
 
@@ -60,17 +48,9 @@ pub async fn connect_redis(
                 },
             );
 
-            Ok(RedisResponse {
-                success: true,
-                message: format!("成功连接到 {}", config.name),
-                value: None,
-            })
+            Ok(Response::<()>::success_empty_with_message(format!("成功连接到 {}", config.name)))
         }
-        Err(e) => Ok(RedisResponse {
-            success: false,
-            message: format!("连接失败: {}", e),
-            value: None,
-        }),
+        Err(e) => Ok(Response::error(format!("连接失败: {}", e))),
     }
 }
 
@@ -79,20 +59,12 @@ pub async fn connect_redis(
 pub async fn disconnect_redis(
     connection_id: String,
     state: State<'_, AppState>,
-) -> Result<RedisResponse, String> {
+) -> Result<Response<()>, String> {
     let mut connections = state.connections.lock().unwrap();
 
     if connections.remove(&connection_id).is_some() {
-        Ok(RedisResponse {
-            success: true,
-            message: "连接已断开".to_string(),
-            value: None,
-        })
+        Ok(Response::<()>::success_empty_with_message("连接已断开".to_string()))
     } else {
-        Ok(RedisResponse {
-            success: false,
-            message: "连接不存在".to_string(),
-            value: None,
-        })
+        Ok(Response::error("连接不存在".to_string()))
     }
 }

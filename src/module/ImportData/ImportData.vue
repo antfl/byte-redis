@@ -1,6 +1,6 @@
 <template>
   <a-modal
-    v-model:visible="visible"
+    v-model:open="visible"
     title="导入数据"
     width="600px"
     :footer="null"
@@ -67,9 +67,9 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
 import { message } from "ant-design-vue";
-import { invoke } from "@tauri-apps/api/core";
 import { useConnectionStore } from "@/stores/useConnectionStore.ts";
 import { ImportOutlined, UploadOutlined } from "@ant-design/icons-vue";
+import { importKey, importKeys } from "@/api";
 
 const visible = ref(false);
 const importMethod = ref("file");
@@ -84,7 +84,7 @@ const loading = ref(false);
 
 const connectionStore = useConnectionStore();
 
-const use = () => {
+const open = () => {
 	visible.value = true;
 	resetForm();
 };
@@ -142,23 +142,17 @@ const handleImport = async () => {
 		let result;
 		if (Array.isArray(importData.value)) {
 			// 导入多个键
-			result = await invoke<{ message: string; success: boolean }>(
-				"import_keys",
-				{
-					connectionId: connectionStore.activeConnection.id,
-					keys: importData.value,
-					overwrite: overwrite.value,
-				},
+			result = await importKeys(
+				connectionStore.activeConnection.id,
+				importData.value,
+				overwrite.value,
 			);
 		} else {
 			// 导入单个键
-			result = await invoke<{ message: string; success: boolean }>(
-				"import_key",
-				{
-					connectionId: connectionStore.activeConnection.id,
-					keyDetail: importData.value,
-					overwrite: overwrite.value,
-				},
+			result = await importKey(
+				connectionStore.activeConnection.id,
+				importData.value,
+				overwrite.value,
 			);
 		}
 
@@ -167,6 +161,12 @@ const handleImport = async () => {
 
 		if (result.success) {
 			message.success("导入成功");
+			// 刷新 key 列表
+			connectionStore.refreshKeyList();
+			// 延迟关闭弹窗，让用户看到结果
+			setTimeout(() => {
+				visible.value = false;
+			}, 1500);
 		} else {
 			message.error("导入过程中出现错误");
 		}
@@ -179,5 +179,6 @@ const handleImport = async () => {
 	}
 };
 
-defineExpose({ use });
+defineExpose({ open });
 </script>
+

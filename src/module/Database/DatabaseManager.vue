@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import {invoke} from "@tauri-apps/api/core";
+import { ref, computed, watch } from 'vue';
 import {message} from "ant-design-vue";
 import database from "@/assets/svg/database.svg";
 import downOutlined from "@/assets/svg/down-outlined.svg";
 import IconButton from "@/components/IconButton/index.vue";
 import {useConnectionStore} from "@/stores/useConnectionStore.ts";
+import { getDbCount, getDbKeyCount, getAllDbKeyCounts, selectDb } from "@/api";
 
 interface DatabaseInfo {
 	index: number;
@@ -25,9 +26,12 @@ const fetchDbCount = async (): Promise<number> => {
 	}
 
 	try {
-    return await invoke<number>("get_db_count", {
-      connectionId: activeConnection.value.id,
-    });
+		const res = await getDbCount(activeConnection.value.id);
+		if (!res.success || res.data === undefined) {
+			message.error(res.message || "获取数据库数量失败");
+			return 16;
+		}
+		return res.data;
 	} catch (error) {
 		console.error("获取数据库数量失败:", error);
 		message.error("获取数据库数量失败");
@@ -42,10 +46,11 @@ const fetchDbKeyCount = async (dbIndex: number): Promise<number> => {
 	}
 
 	try {
-    return await invoke<number>("get_db_key_count", {
-      connectionId: activeConnection.value.id,
-      dbIndex: dbIndex,
-    });
+		const res = await getDbKeyCount(activeConnection.value.id, dbIndex);
+		if (!res.success || res.data === undefined) {
+			return 0;
+		}
+		return res.data;
 	} catch (error) {
 		console.error(`获取数据库 DB${dbIndex.toString().padStart(2, "0")} 键数量失败:`, error);
 		return 0;
@@ -65,14 +70,14 @@ const loadDatabases = async () => {
 
 		// 使用批量接口获取所有数据库的键数量
 		try {
-			const results = await invoke<Array<[number, number]>>("get_all_db_key_counts", {
-				connectionId: activeConnection.value.id,
-				dbCount: dbCount,
-			});
+			const resultsRes = await getAllDbKeyCounts(activeConnection.value.id, dbCount);
+			if (!resultsRes.success || !resultsRes.data) {
+				throw new Error(resultsRes.message || "批量获取失败");
+			}
 
-			databases.value = results.map(([index, keyCount]) => ({
-				index,
-				keyCount,
+			databases.value = resultsRes.data.map((item) => ({
+				index: item.db_index,
+				keyCount: item.key_count,
 			}));
 		} catch (error) {
 			// 如果批量接口失败，回退到逐个获取
@@ -105,10 +110,11 @@ const selectDatabase = async (dbIndex: number) => {
 	}
 
 	try {
-		await invoke("select_db", {
-			connectionId: activeConnection.value.id,
-			dbIndex: dbIndex,
-		});
+		const res = await selectDb(activeConnection.value.id, dbIndex);
+		if (!res.success) {
+			message.error(res.message || "切换数据库失败");
+			return;
+		}
 
 		connectionStore.setCurrentDbIndex(dbIndex);
 		message.success(`已切换到 DB${dbIndex.toString().padStart(2, "0")}`);
@@ -178,3 +184,4 @@ watch(
 		</template>
 	</a-dropdown>
 </template>
+

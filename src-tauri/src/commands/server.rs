@@ -1,4 +1,5 @@
 use crate::state::AppState;
+use crate::commands::response::Response;
 use serde::Serialize;
 use tauri::State;
 
@@ -32,24 +33,26 @@ pub struct RedisServerInfo {
 pub async fn get_redis_server_info(
     connection_id: String,
     state: State<'_, AppState>,
-) -> Result<RedisServerInfo, String> {
+) -> Result<Response<RedisServerInfo>, String> {
     let connections = state.connections.lock().unwrap();
-    let conn_state = connections
-        .get(&connection_id)
-        .ok_or("Redis 未连接".to_string())?;
+    let conn_state = match connections.get(&connection_id) {
+        Some(cs) => cs,
+        None => return Ok(Response::error("Redis 未连接".to_string())),
+    };
 
-    let mut conn = conn_state
-        .client
-        .get_connection()
-        .map_err(|e| format!("获取连接失败: {}", e))?;
+    let mut conn = match conn_state.client.get_connection() {
+        Ok(c) => c,
+        Err(e) => return Ok(Response::error(format!("获取连接失败: {}", e))),
+    };
 
     // 一次性获取所有INFO信息
-    let info: String = redis::cmd("INFO")
-        .query(&mut conn)
-        .map_err(|e| format!("获取Redis信息失败: {}", e))?;
+    let info: String = match redis::cmd("INFO").query(&mut conn) {
+        Ok(i) => i,
+        Err(e) => return Ok(Response::error(format!("获取Redis信息失败: {}", e))),
+    };
 
     // 解析所有需要的信息
-    Ok(RedisServerInfo {
+    Ok(Response::success(RedisServerInfo {
         // 原有指标
         memory_usage: parse_info_value(&info, "used_memory").unwrap_or(0),
         maxmemory: parse_info_value(&info, "maxmemory").unwrap_or(0),
@@ -72,7 +75,7 @@ pub async fn get_redis_server_info(
         aof_size: parse_info_value(&info, "aof_current_size").unwrap_or(0),
         rdb_last_save: parse_info_value(&info, "rdb_last_save_time").unwrap_or(0),
         connected_slaves: parse_info_value(&info, "connected_slaves").unwrap_or(0),
-    })
+    }))
 }
 
 // 辅助函数：解析数值类型的信息

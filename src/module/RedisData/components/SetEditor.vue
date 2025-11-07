@@ -21,7 +21,7 @@
       </a-button>
     </div>
 
-    <a-modal v-model:visible="setItemModalVisible" :title="setItemModalTitle" @ok="handleSetItemOperation" @cancel="closeSetItemModal">
+    <a-modal v-model:open="setItemModalVisible" :title="setItemModalTitle" @ok="handleSetItemOperation" @cancel="closeSetItemModal">
       <a-form layout="vertical">
         <a-form-item label="元素值">
           <a-input v-model:value="setItem.value" />
@@ -34,13 +34,13 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from "vue";
 import { message, Modal } from "ant-design-vue";
-import { invoke } from "@tauri-apps/api/core";
 import {
 	EditOutlined,
 	DeleteOutlined,
 	PlusOutlined,
 } from "@ant-design/icons-vue";
 import { useConnectionStore } from "@/stores/useConnectionStore.ts";
+import { addSetItem, deleteSetItem as deleteSetItemApi } from "@/api";
 
 interface RedisKey {
 	key: string;
@@ -93,36 +93,53 @@ const handleSetItemOperation = async () => {
 	}
 
 	try {
-		if (setItem.originalValue) {
-			await invoke("delete_set_item", {
-				connectionId: connectionStore?.activeConnection?.id,
-				key: props.keyData.key,
-				value: setItem.originalValue,
-			});
-
-			await invoke("add_set_item", {
-				connectionId: connectionStore?.activeConnection?.id,
-				key: props.keyData.key,
-				value: setItem.value,
-			});
-
-			const index = props.keyData.value.findIndex((v: string) => v === setItem.originalValue);
-			if (index !== -1) {
-				props.keyData.value[index] = setItem.value;
-			}
-			message.success("元素已更新");
-		} else {
-			await invoke("add_set_item", {
-				connectionId: connectionStore?.activeConnection?.id,
-				key: props.keyData.key,
-				value: setItem.value,
-			});
-
-			props.keyData.value.push(setItem.value);
-			message.success("元素已添加");
+		if (!connectionStore?.activeConnection?.id) {
+			message.error("未选择连接");
+			return;
 		}
 
-		setItemModalVisible.value = false;
+		if (setItem.originalValue) {
+			// 先删除旧值，再添加新值
+			const deleteRes = await deleteSetItemApi(
+				connectionStore.activeConnection.id,
+				props.keyData.key,
+				setItem.originalValue,
+			);
+			if (!deleteRes.success) {
+				message.error(deleteRes.message || "删除旧值失败");
+				return;
+			}
+
+			const addRes = await addSetItem(
+				connectionStore.activeConnection.id,
+				props.keyData.key,
+				setItem.value,
+			);
+			if (addRes.success) {
+				const index = props.keyData.value.findIndex((v: string) => v === setItem.originalValue);
+				if (index !== -1) {
+					props.keyData.value[index] = setItem.value;
+				}
+				message.success(addRes.message || "元素已更新");
+				setItemModalVisible.value = false;
+			} else {
+				message.error(addRes.message || "添加新值失败");
+			}
+		} else {
+			const res = await addSetItem(
+				connectionStore.activeConnection.id,
+				props.keyData.key,
+				setItem.value,
+			);
+
+			if (res.success) {
+				props.keyData.value.push(setItem.value);
+				message.success(res.message || "元素已添加");
+				setItemModalVisible.value = false;
+			} else {
+				message.error(res.message || "添加失败");
+			}
+		}
 	} catch (error) {
 		message.error(`操作失败: ${error}`);
 	}
@@ -137,14 +154,23 @@ const deleteSetItem = (value: string) => {
 		cancelText: "取消",
 		async onOk() {
 			try {
-				await invoke("delete_set_item", {
-					connectionId: connectionStore?.activeConnection?.id,
-					key: props.keyData.key,
-					value,
-				});
+				if (!connectionStore?.activeConnection?.id) {
+					message.error("未选择连接");
+					return;
+				}
 
-				props.keyData.value = props.keyData.value.filter((v: string) => v !== value);
-				message.success("元素已删除");
+				const res = await deleteSetItemApi(
+					connectionStore.activeConnection.id,
+					props.keyData.key,
+					value,
+				);
+
+				if (res.success) {
+					props.keyData.value = props.keyData.value.filter((v: string) => v !== value);
+					message.success(res.message || "元素已删除");
+				} else {
+					message.error(res.message || "删除失败");
+				}
 			} catch (error) {
 				message.error(`删除失败: ${error}`);
 			}

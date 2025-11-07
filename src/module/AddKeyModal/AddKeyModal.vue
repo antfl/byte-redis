@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { ref, reactive, watch } from 'vue';
+import { DeleteOutlined, PlusOutlined } from '@ant-design/icons-vue';
 import { message } from "ant-design-vue";
 
 export type KeyType = "string" | "hash" | "list" | "set" | "zset";
@@ -47,10 +49,12 @@ watch(visible, (val) => {
 	if (!val) resetForm();
 });
 
-const use = (options: {
-	onSuccess: (data: typeof formData) => Promise<void>;
+const open = (options?: {
+	onSuccess?: (data: typeof formData) => Promise<void>;
 }) => {
-	successCallback = options.onSuccess;
+	if (options?.onSuccess) {
+		successCallback = options.onSuccess;
+	}
 	visible.value = true;
 };
 
@@ -172,7 +176,7 @@ const removeZSetItem = (index: number) => {
 	}
 };
 
-defineExpose({ use });
+defineExpose({ open });
 </script>
 
 <template>
@@ -349,16 +353,16 @@ defineExpose({ use });
 
       <!-- 有序集合类型 -->
       <div v-if="formData.type === 'zset'">
-        <a-form-item label="有序集合元素">
+        <a-form-item label="有序集合元素" :help="'分数 (Score) 用于排序，分数越小越靠前。可以是任意浮点数（包括负数）'">
           <div class="zset-items-container">
             <div v-for="(item, index) in formData.zsetValue" :key="index" class="zset-item">
               <a-row :gutter="12" align="middle">
                 <a-col :span="8">
                   <a-input-number
                     v-model:value="item.score"
-                    placeholder="分数"
-                    :min="0"
-                    :step="1"
+                    placeholder="分数 (Score)"
+                    :precision="2"
+                    :step="0.1"
                     :disabled="loading"
                     class="w-full"
                   />
@@ -462,3 +466,4 @@ defineExpose({ use });
   width: 100%;
 }
 </style>
+

@@ -1,6 +1,6 @@
 <template>
   <a-modal
-    v-model:visible="visible"
+    v-model:open="visible"
     title="导出数据"
     width="600px"
     :footer="null"
@@ -8,10 +8,13 @@
     <a-form layout="vertical">
       <a-form-item label="导出范围">
         <a-radio-group v-model:value="exportScope">
-          <a-radio value="current">当前键</a-radio>
+          <a-radio value="current" :disabled="!currentKey">当前键</a-radio>
           <a-radio value="all">所有键</a-radio>
           <a-radio value="pattern">匹配模式</a-radio>
         </a-radio-group>
+        <div v-if="exportScope === 'current' && !currentKey" class="text-red-500 text-xs mt-5px">
+          请先在左侧选择一个键
+        </div>
       </a-form-item>
 
       <a-form-item v-if="exportScope === 'pattern'" label="键名模式">
@@ -48,15 +51,15 @@
 </template>
 
 <script setup lang="ts">
+import { ref, computed } from "vue";
 import { message } from "ant-design-vue";
-import { invoke } from "@tauri-apps/api/core";
 import { useConnectionStore } from "@/stores/useConnectionStore.ts";
+import { exportKey, exportKeys } from "@/api";
 import {
 	ExportOutlined,
 	CopyOutlined,
 	DownloadOutlined,
 } from "@ant-design/icons-vue";
-import { computed } from "vue";
 
 const visible = ref(false);
 const exportScope = ref("current");
@@ -68,8 +71,11 @@ const connectionStore = useConnectionStore();
 
 const currentKey = computed(() => connectionStore.currentKey);
 
-const use = () => {
+const open = () => {
 	visible.value = true;
+	exportData.value = "";
+	exportScope.value = "current";
+	pattern.value = "";
 };
 
 const handleExport = async () => {
@@ -85,26 +91,29 @@ const handleExport = async () => {
 			if (!currentKey.value) {
 				throw new Error("当前没有选中的键");
 			}
-			const data = await invoke("export_key", {
-				connectionId: connectionStore.activeConnection.id,
-				key: currentKey.value,
-			});
-			exportData.value = JSON.stringify(data, null, 2);
+			const res = await exportKey(connectionStore.activeConnection.id, currentKey.value);
+			if (!res.success || !res.data) {
+				message.error(res.message || "导出失败");
+				return;
+			}
+			exportData.value = JSON.stringify(res.data, null, 2);
 		} else if (exportScope.value === "all") {
-			const data = await invoke("export_keys", {
-				connectionId: connectionStore.activeConnection.id,
-				pattern: "*",
-			});
-			exportData.value = JSON.stringify(data, null, 2);
+			const res = await exportKeys(connectionStore.activeConnection.id, "*");
+			if (!res.success || !res.data) {
+				message.error(res.message || "导出失败");
+				return;
+			}
+			exportData.value = JSON.stringify(res.data, null, 2);
 		} else if (exportScope.value === "pattern") {
 			if (!pattern.value.trim()) {
 				throw new Error("请输入键名模式");
 			}
-			const data = await invoke("export_keys", {
-				connectionId: connectionStore.activeConnection.id,
-				pattern: pattern.value,
-			});
-			exportData.value = JSON.stringify(data, null, 2);
+			const res = await exportKeys(connectionStore.activeConnection.id, pattern.value);
+			if (!res.success || !res.data) {
+				message.error(res.message || "导出失败");
+				return;
+			}
+			exportData.value = JSON.stringify(res.data, null, 2);
 		}
 		message.success("导出成功");
 	} catch (error) {
@@ -135,5 +144,6 @@ const downloadFile = () => {
 	URL.revokeObjectURL(url);
 };
 
-defineExpose({ use });
+defineExpose({ open });
 </script>
+

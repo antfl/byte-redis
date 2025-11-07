@@ -21,7 +21,7 @@
       </a-button>
     </div>
 
-    <a-modal v-model:visible="hashFieldModalVisible" :title="hashFieldModalTitle" @ok="handleHashFieldOperation" @cancel="closeHashFieldModal">
+    <a-modal v-model:open="hashFieldModalVisible" :title="hashFieldModalTitle" @ok="handleHashFieldOperation" @cancel="closeHashFieldModal">
       <a-form layout="vertical">
         <a-form-item label="字段名">
           <a-input v-model:value="hashField.field" :disabled="isEditingHashField" />
@@ -37,13 +37,13 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from "vue";
 import { message, Modal } from "ant-design-vue";
-import { invoke } from "@tauri-apps/api/core";
 import {
 	EditOutlined,
 	DeleteOutlined,
 	PlusOutlined,
 } from "@ant-design/icons-vue";
 import { useConnectionStore } from "@/stores/useConnectionStore.ts";
+import { updateHashField, deleteHashField as deleteHashFieldApi } from "@/api";
 
 interface RedisKey {
 	key: string;
@@ -97,32 +97,32 @@ const handleHashFieldOperation = async () => {
 	}
 
 	try {
-		if (isEditingHashField.value) {
-			await invoke("update_hash_field", {
-				connectionId: connectionStore?.activeConnection?.id,
-				key: props.keyData.key,
-				field: hashField.field,
-				value: hashField.value,
-			});
-
-			const index = props.keyData.value.findIndex((item: HashItem) => item.field === hashField.field);
-			if (index !== -1) {
-				props.keyData.value[index].value = hashField.value;
-			}
-			message.success("字段已更新");
-		} else {
-			await invoke("update_hash_field", {
-				connectionId: connectionStore?.activeConnection?.id,
-				key: props.keyData.key,
-				field: hashField.field,
-				value: hashField.value,
-			});
-
-			props.keyData.value.push({ field: hashField.field, value: hashField.value });
-			message.success("字段已添加");
+		if (!connectionStore?.activeConnection?.id) {
+			message.error("未选择连接");
+			return;
 		}
 
-		hashFieldModalVisible.value = false;
+		const res = await updateHashField(
+			connectionStore.activeConnection.id,
+			props.keyData.key,
+			hashField.field,
+			hashField.value,
+		);
+
+		if (res.success) {
+			const index = props.keyData.value.findIndex((item: HashItem) => item.field === hashField.field);
+			if (index !== -1) {
+				// 字段已存在，更新值
+				props.keyData.value[index].value = hashField.value;
+			} else {
+				// 字段不存在，添加新字段
+				props.keyData.value.push({ field: hashField.field, value: hashField.value });
+			}
+			message.success(res.message || (isEditingHashField.value ? "字段已更新" : "字段已添加"));
+			hashFieldModalVisible.value = false;
+		} else {
+			message.error(res.message || "操作失败");
+		}
 	} catch (error) {
 		message.error(`操作失败: ${error}`);
 	}
@@ -137,14 +137,23 @@ const deleteHashField = (field: string) => {
 		cancelText: "取消",
 		async onOk() {
 			try {
-				await invoke("delete_hash_field", {
-					connectionId: connectionStore?.activeConnection?.id,
-					key: props.keyData.key,
-					field,
-				});
+				if (!connectionStore?.activeConnection?.id) {
+					message.error("未选择连接");
+					return;
+				}
 
-				props.keyData.value = props.keyData.value.filter((item: HashItem) => item.field !== field);
-				message.success("字段已删除");
+				const res = await deleteHashFieldApi(
+					connectionStore.activeConnection.id,
+					props.keyData.key,
+					field,
+				);
+
+				if (res.success) {
+					props.keyData.value = props.keyData.value.filter((item: HashItem) => item.field !== field);
+					message.success(res.message || "字段已删除");
+				} else {
+					message.error(res.message || "删除失败");
+				}
 			} catch (error) {
 				message.error(`删除失败: ${error}`);
 			}

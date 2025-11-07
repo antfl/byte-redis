@@ -1,9 +1,10 @@
 <script setup lang="ts">
+import { storeToRefs } from 'pinia';
 import { ThemeMode, useThemeStore } from '@/stores/theme';
+
 const themeStore = useThemeStore();
 const { themeMode } = storeToRefs(themeStore);
 const { toggleTheme } = themeStore;
-import { storeToRefs } from 'pinia';
 
 const themeList: { value: ThemeMode; title: string }[] = [
   {

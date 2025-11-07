@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import {message} from "ant-design-vue";
-import type {FormInstance} from "ant-design-vue";
+import { ref } from 'vue';
+import { message } from "ant-design-vue";
+import type { FormInstance } from "ant-design-vue";
 
 // 定义表单状态类型
 interface ConnectionFormState {
@@ -13,11 +14,11 @@ interface ConnectionFormState {
   db: number;
 }
 
-// 定义 use 函数的参数类型
-interface UseParams {
-  onSuccess: (formData: ConnectionFormState) => Promise<void> | void;
-  formData: Partial<ConnectionFormState>;
-  title: string;
+// 定义 open 函数的参数类型
+interface OpenParams {
+  onSuccess?: (formData: ConnectionFormState) => Promise<void> | void;
+  formData?: Partial<ConnectionFormState>;
+  title?: string;
 }
 
 const visible = ref(false);
@@ -61,20 +62,24 @@ const handleSubmit = async () => {
 let callback: ((formData: ConnectionFormState) => Promise<void> | void) | null =
   null;
 
-const use = (params: UseParams) => {
-  callback = params.onSuccess;
-  modalTitle.value = params.title || '新建连接';
+const open = (params?: OpenParams) => {
+  if (params?.onSuccess) {
+    callback = params.onSuccess;
+  }
+  modalTitle.value = params?.title || '新建连接';
 
   // 合并表单数据
-  formState.value = {
-    ...formState.value,
-    ...params.formData,
-  };
+  if (params?.formData) {
+    formState.value = {
+      ...formState.value,
+      ...params.formData,
+    };
+  }
 
   visible.value = true;
 };
 
-defineExpose({use});
+defineExpose({ open });
 </script>
 
 <template>
@@ -110,3 +115,4 @@ defineExpose({use});
     </a-form>
   </a-modal>
 </template>
+

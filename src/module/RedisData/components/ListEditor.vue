@@ -21,7 +21,7 @@
       </a-button>
     </div>
 
-    <a-modal v-model:visible="listItemModalVisible" :title="listItemModalTitle" @ok="handleListItemOperation" @cancel="closeListItemModal">
+    <a-modal v-model:open="listItemModalVisible" :title="listItemModalTitle" @ok="handleListItemOperation" @cancel="closeListItemModal">
       <a-form layout="vertical">
         <a-form-item label="元素值">
           <a-input v-model:value="listItem.value" />
@@ -34,13 +34,13 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from "vue";
 import { message, Modal } from "ant-design-vue";
-import { invoke } from "@tauri-apps/api/core";
 import {
 	EditOutlined,
 	DeleteOutlined,
 	PlusOutlined,
 } from "@ant-design/icons-vue";
 import { useConnectionStore } from "@/stores/useConnectionStore.ts";
+import { updateListItem, appendListItem, deleteListItem as deleteListItemApi } from "@/api";
 
 interface RedisKey {
 	key: string;
@@ -95,28 +95,41 @@ const handleListItemOperation = async () => {
 	}
 
 	try {
-		if (listItem.index >= 0) {
-			await invoke("update_list_item", {
-				connectionId: connectionStore?.activeConnection?.id,
-				key: props.keyData.key,
-				index: listItem.index,
-				value: listItem.value,
-			});
-
-			props.keyData.value[listItem.index] = listItem.value;
-			message.success("元素已更新");
-		} else {
-			await invoke("append_list_item", {
-				connectionId: connectionStore?.activeConnection?.id,
-				key: props.keyData.key,
-				value: listItem.value,
-			});
-
-			props.keyData.value.push(listItem.value);
-			message.success("元素已添加");
+		if (!connectionStore?.activeConnection?.id) {
+			message.error("未选择连接");
+			return;
 		}
 
-		listItemModalVisible.value = false;
+		if (listItem.index >= 0) {
+			const res = await updateListItem(
+				connectionStore.activeConnection.id,
+				props.keyData.key,
+				listItem.index,
+				listItem.value,
+			);
+
+			if (res.success) {
+				props.keyData.value[listItem.index] = listItem.value;
+				message.success(res.message || "元素已更新");
+				listItemModalVisible.value = false;
+			} else {
+				message.error(res.message || "更新失败");
+			}
+		} else {
+			const res = await appendListItem(
+				connectionStore.activeConnection.id,
+				props.keyData.key,
+				listItem.value,
+			);
+
+			if (res.success) {
+				props.keyData.value.push(listItem.value);
+				message.success(res.message || "元素已添加");
+				listItemModalVisible.value = false;
+			} else {
+				message.error(res.message || "添加失败");
+			}
+		}
 	} catch (error) {
 		message.error(`操作失败: ${error}`);
 	}
@@ -131,15 +144,24 @@ const deleteListItem = (record: ListItem) => {
 		cancelText: "取消",
 		async onOk() {
 			try {
-				await invoke("delete_list_item", {
-					connectionId: connectionStore?.activeConnection?.id,
-					key: props.keyData.key,
-					value: record.value,
-					count: 1,
-				});
+				if (!connectionStore?.activeConnection?.id) {
+					message.error("未选择连接");
+					return;
+				}
 
-				props.keyData.value.splice(record.index, 1);
-				message.success("元素已删除");
+				const res = await deleteListItemApi(
+					connectionStore.activeConnection.id,
+					props.keyData.key,
+					record.value,
+					1,
+				);
+
+				if (res.success) {
+					props.keyData.value.splice(record.index, 1);
+					message.success(res.message || "元素已删除");
+				} else {
+					message.error(res.message || "删除失败");
+				}
 			} catch (error) {
 				message.error(`删除失败: ${error}`);
 			}

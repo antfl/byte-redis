@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import Theme from './Theme.vue'
+import { ref } from 'vue';
+import Theme from './Theme.vue';
+
 const visible = ref(false);
 
 const open = () => {
@@ -33,3 +35,4 @@ defineExpose({ open });
     </div>
   </a-modal>
 </template>
+

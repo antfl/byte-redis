@@ -1,8 +1,21 @@
 <script setup lang="ts">
-import { invoke } from "@tauri-apps/api/core";
+import { ref, computed, watch, nextTick } from 'vue';
+import {
+  CloseOutlined,
+  SearchOutlined,
+  PlusOutlined,
+  ReloadOutlined,
+  SwapOutlined,
+  ArrowUpOutlined,
+  ArrowDownOutlined,
+  DownOutlined,
+} from '@ant-design/icons-vue';
 import { storeToRefs } from "pinia";
 import { useConnectionStore } from "@/stores/useConnectionStore.ts";
-import AddKeyModal from "@/module/AddKeyModal/index.vue";
+import { connectRedis, getKeys, setKey } from "@/api";
+import AddKeyModal from "@/module/AddKeyModal/AddKeyModal.vue";
+import ExportData from "@/module/ExportData/ExportData.vue";
+import ImportData from "@/module/ImportData/ImportData.vue";
 import { message } from "ant-design-vue";
 import IconButton from "@/components/IconButton/index.vue";
 
@@ -36,19 +49,15 @@ interface AddKeyFormData {
 	type: string;
 	ttl?: number;
 	stringValue?: string;
-	hashValue?: Record<string, string>;
+	hashValue?: Array<{ field: string; value: string }>;
 	listValue?: string[];
 	setValue?: string[];
-	zsetValue?: Array<[string, number]>;
+	zsetValue?: Array<{ score: number; value: string }>;
 }
 
-interface SetKeyResult {
-	success: boolean;
-	message: string;
-}
 
 const connectionStore = useConnectionStore();
-const { activeConnectionId, currentDbIndex, activeConnection } = storeToRefs(connectionStore);
+const { activeConnectionId, currentDbIndex, activeConnection, keyListRefreshTrigger } = storeToRefs(connectionStore);
 const filterText = ref("");
 const isLoading = ref(true);
 const fullTreeData = ref<TreeNode[]>([]);
@@ -114,6 +123,18 @@ watch(
 	},
 );
 
+// 监听 key 列表刷新触发器
+watch(
+	keyListRefreshTrigger,
+	() => {
+		if (activeConnection.value && activeConnectionId.value) {
+			nextTick(() => {
+				init(activeConnection.value as ConnectionConfig, true);
+			});
+		}
+	},
+);
+
 const init = async (config: ConnectionConfig, skipConnect = false) => {
 	if (!config) {
 		return;
@@ -122,27 +143,31 @@ const init = async (config: ConnectionConfig, skipConnect = false) => {
 	fullTreeData.value = [];
 	try {
 		if (!skipConnect) {
-			await invoke("connect_redis", {
-				config: {
-					name: config.name,
-					id: config.id,
-					host: config.host,
-					username: config.username,
-					password: config.password,
-					port: config.port,
-				},
+			const connectRes = await connectRedis({
+				name: config.name,
+				id: config.id,
+				host: config.host,
+				username: config.username,
+				password: config.password,
+				port: config.port,
 			});
+			if (!connectRes.success) {
+				message.error(connectRes.message);
+				return;
+			}
 		}
 
-		const { keys } = await invoke<{ keys: KeyItem[] }>("get_keys", {
-			connectionId: config.id,
-			pattern: "*",
-		});
+		const keysRes = await getKeys(config.id, "*");
+		if (!keysRes.success || !keysRes.data) {
+			message.error(keysRes.message || "获取键列表失败");
+			return;
+		}
 
-		fullTreeData.value = buildKeyTree(keys, ":");
+		fullTreeData.value = buildKeyTree(keysRes.data.keys, ":");
 		setTreeHeight();
 	} catch (error) {
 		console.error("初始化失败:", error);
+		message.error(`初始化失败: ${error}`);
 	} finally {
 		isLoading.value = false;
 	}
@@ -220,40 +245,55 @@ const selectKey = async (selectedKeys: string[]) => {
 };
 
 const AddKeyModalRef = ref();
+const ExportDataRef = ref();
+const ImportDataRef = ref();
 
 const showAddKeyModal = () => {
-	AddKeyModalRef.value?.use({
+	AddKeyModalRef.value?.open({
 		onSuccess: async (data: AddKeyFormData) => {
 			try {
 				let value: any;
 				switch (data.type) {
 					case "string":
-						value = data.stringValue;
+						value = data.stringValue || "";
 						break;
 					case "hash":
-						value = data.hashValue;
+						// 将 Array<{ field: string; value: string }> 转换为 Record<string, string>
+						const hashObj: Record<string, string> = {};
+						(data.hashValue || []).forEach((item) => {
+							if (item.field && item.value) {
+								hashObj[item.field] = item.value;
+							}
+						});
+						value = hashObj;
 						break;
 					case "list":
-						value = data.listValue;
+						value = data.listValue || [];
 						break;
 					case "set":
-						value = data.setValue;
+						value = data.setValue || [];
 						break;
 					case "zset":
-						value = data.zsetValue;
+						// zset 需要转换为 [["member", score], ...] 格式
+						// data.zsetValue 是 { score: number, value: string }[] 格式
+						value = (data.zsetValue || []).map((item) => [item.value, item.score]);
 						break;
 				}
 
-				const result = await invoke<SetKeyResult>("set_key", {
-					connectionId: activeConnectionId.value,
-					key: data.key,
-					keyType: data.type,
-					value: value,
-					ttl: data.ttl,
-				});
+				const result = await setKey(
+					activeConnectionId.value!,
+					data.key,
+					data.type,
+					value,
+					data.ttl || 0,
+				);
 
 				if (result.success) {
 					message.success(result.message);
+					// 刷新键列表
+					if (activeConnection.value) {
+						init(activeConnection.value as ConnectionConfig, true);
+					}
 				} else {
 					message.error(result.message);
 				}
@@ -289,7 +329,15 @@ const loadKeys = () => {
   if (activeConnection.value) {
     init(activeConnection.value as ConnectionConfig, true);
   }
-}
+};
+
+const showExportModal = () => {
+	ExportDataRef.value?.open();
+};
+
+const showImportModal = () => {
+	ImportDataRef.value?.open();
+};
 </script>
 
 <template>
@@ -350,15 +398,17 @@ const loadKeys = () => {
         <SwapOutlined />
       </IconButton>
       <div class="flex">
-        <IconButton class="size-24px!" tooltip="导入" placement="top">
+        <IconButton class="size-24px!" tooltip="导入" placement="top" @click="showImportModal">
           <ArrowUpOutlined/>
         </IconButton>
-        <IconButton class="size-24px!" tooltip="导出" placement="top">
+        <IconButton class="size-24px!" tooltip="导出" placement="top" @click="showExportModal">
           <ArrowDownOutlined/>
         </IconButton>
       </div>
     </div>
     <AddKeyModal ref="AddKeyModalRef"/>
+    <ExportData ref="ExportDataRef"/>
+    <ImportData ref="ImportDataRef"/>
   </div>
 </template>
 
@@ -385,3 +435,4 @@ const loadKeys = () => {
 }
 
 </style>
+

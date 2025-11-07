@@ -1,8 +1,9 @@
-use crate::state::{AppState};
+use crate::state::AppState;
+use crate::commands::response::Response;
 use serde::Serialize;
 use tauri::State;
 use serde_json::json;
-use chrono::{DateTime, Utc, TimeZone};
+use chrono::{Utc, TimeZone};
 
 // 键基本信息结构体
 #[derive(Debug, Serialize)]
@@ -24,32 +25,11 @@ pub struct KeyDetail {
     pub value: serde_json::Value, // 根据类型存储不同的值
 }
 
-// 键列表响应结构体
+// 键列表响应数据
 #[derive(Debug, Serialize)]
-pub struct KeysResponse {
-    pub success: bool,
-    pub message: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub keys: Option<Vec<KeyInfo>>,
+pub struct KeysListData {
+    pub keys: Vec<KeyInfo>,
     pub total: usize,
-}
-
-// 键详情响应结构体
-#[derive(Debug, Serialize)]
-pub struct KeyDetailResponse {
-    pub success: bool,
-    pub message: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub detail: Option<KeyDetail>,
-}
-
-// 通用响应结构体
-#[derive(Debug, Serialize)]
-pub struct RedisResponse {
-    pub success: bool,
-    pub message: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub value: Option<String>,
 }
 
 // 设置键值命令
@@ -57,10 +37,11 @@ pub struct RedisResponse {
 pub async fn set_key(
     connection_id: String,
     key: String,
-    value: String,
+    key_type: String,
+    value: serde_json::Value,
     ttl: i64,
     state: State<'_, AppState>,
-) -> Result<RedisResponse, String> {
+) -> Result<Response<()>, String> {
     let connections = state.connections.lock().unwrap();
 
     if let Some(conn_state) = connections.get(&connection_id) {
@@ -68,51 +49,121 @@ pub async fn set_key(
             Ok(mut conn) => {
                 let current_db = conn_state.current_db;
                 if let Err(e) = redis::cmd("SELECT").arg(current_db).query::<()>(&mut conn) {
-                    return Ok(RedisResponse {
-                        success: false,
-                        message: format!("切换到数据库 {} 失败: {}", current_db, e),
-                        value: None,
-                    });
+                    return Ok(Response::error(format!("切换到数据库 {} 失败: {}", current_db, e)));
                 }
 
-                let result = if ttl > 0 {
-                    redis::cmd("SETEX")
-                        .arg(&key)
-                        .arg(ttl)
-                        .arg(&value)
-                        .query::<()>(&mut conn)
-                } else {
-                    redis::cmd("SET")
-                        .arg(&key)
-                        .arg(&value)
-                        .query::<()>(&mut conn)
+                let result = match key_type.as_str() {
+                    "string" => {
+                        let string_value = value.as_str().unwrap_or("");
+                        if ttl > 0 {
+                            redis::cmd("SETEX")
+                                .arg(&key)
+                                .arg(ttl)
+                                .arg(string_value)
+                                .query::<()>(&mut conn)
+                        } else {
+                            redis::cmd("SET")
+                                .arg(&key)
+                                .arg(string_value)
+                                .query::<()>(&mut conn)
+                        }
+                    }
+                    "hash" => {
+                        let hash_map: std::collections::HashMap<String, String> = serde_json::from_value(value)
+                            .map_err(|e| format!("解析哈希值失败: {}", e))?;
+                        
+                        // 先删除旧键（如果存在）
+                        let _ = redis::cmd("DEL").arg(&key).query::<()>(&mut conn);
+                        
+                        // 使用 HSET 批量设置
+                        let mut cmd = redis::cmd("HSET");
+                        cmd.arg(&key);
+                        for (field, val) in hash_map {
+                            cmd.arg(field).arg(val);
+                        }
+                        let result = cmd.query::<()>(&mut conn);
+                        
+                        // 设置 TTL
+                        if result.is_ok() && ttl > 0 {
+                            let _ = redis::cmd("EXPIRE").arg(&key).arg(ttl).query::<()>(&mut conn);
+                        }
+                        result
+                    }
+                    "list" => {
+                        let list_items: Vec<String> = serde_json::from_value(value)
+                            .map_err(|e| format!("解析列表值失败: {}", e))?;
+                        
+                        // 先删除旧键（如果存在）
+                        let _ = redis::cmd("DEL").arg(&key).query::<()>(&mut conn);
+                        
+                        // 使用 RPUSH 批量添加
+                        let mut cmd = redis::cmd("RPUSH");
+                        cmd.arg(&key);
+                        for item in list_items {
+                            cmd.arg(item);
+                        }
+                        let result = cmd.query::<()>(&mut conn);
+                        
+                        // 设置 TTL
+                        if result.is_ok() && ttl > 0 {
+                            let _ = redis::cmd("EXPIRE").arg(&key).arg(ttl).query::<()>(&mut conn);
+                        }
+                        result
+                    }
+                    "set" => {
+                        let set_items: Vec<String> = serde_json::from_value(value)
+                            .map_err(|e| format!("解析集合值失败: {}", e))?;
+                        
+                        // 先删除旧键（如果存在）
+                        let _ = redis::cmd("DEL").arg(&key).query::<()>(&mut conn);
+                        
+                        // 使用 SADD 批量添加
+                        let mut cmd = redis::cmd("SADD");
+                        cmd.arg(&key);
+                        for item in set_items {
+                            cmd.arg(item);
+                        }
+                        let result = cmd.query::<()>(&mut conn);
+                        
+                        // 设置 TTL
+                        if result.is_ok() && ttl > 0 {
+                            let _ = redis::cmd("EXPIRE").arg(&key).arg(ttl).query::<()>(&mut conn);
+                        }
+                        result
+                    }
+                    "zset" => {
+                        let zset_items: Vec<(String, f64)> = serde_json::from_value(value)
+                            .map_err(|e| format!("解析有序集合值失败: {}", e))?;
+                        
+                        // 先删除旧键（如果存在）
+                        let _ = redis::cmd("DEL").arg(&key).query::<()>(&mut conn);
+                        
+                        // 使用 ZADD 批量添加
+                        let mut cmd = redis::cmd("ZADD");
+                        cmd.arg(&key);
+                        for (member, score) in zset_items {
+                            cmd.arg(score).arg(member);
+                        }
+                        let result = cmd.query::<()>(&mut conn);
+                        
+                        // 设置 TTL
+                        if result.is_ok() && ttl > 0 {
+                            let _ = redis::cmd("EXPIRE").arg(&key).arg(ttl).query::<()>(&mut conn);
+                        }
+                        result
+                    }
+                    _ => return Ok(Response::error(format!("不支持的类型: {}", key_type))),
                 };
 
                 match result {
-                    Ok(_) => Ok(RedisResponse {
-                        success: true,
-                        message: format!("成功设置 {} = {}", key, value),
-                        value: None,
-                    }),
-                    Err(e) => Ok(RedisResponse {
-                        success: false,
-                        message: format!("设置失败: {}", e),
-                        value: None,
-                    }),
+                    Ok(_) => Ok(Response::<()>::success_empty_with_message(format!("成功创建 {} 类型的键 {}", key_type, key))),
+                    Err(e) => Ok(Response::error(format!("设置失败: {}", e))),
                 }
             }
-            Err(e) => Ok(RedisResponse {
-                success: false,
-                message: format!("获取连接失败: {}", e),
-                value: None,
-            }),
+            Err(e) => Ok(Response::error(format!("获取连接失败: {}", e))),
         }
     } else {
-        Ok(RedisResponse {
-            success: false,
-            message: "Redis 未连接".to_string(),
-            value: None,
-        })
+        Ok(Response::error("Redis 未连接".to_string()))
     }
 }
 
@@ -122,7 +173,7 @@ pub async fn get_key(
     connection_id: String,
     key: String,
     state: State<'_, AppState>,
-) -> Result<RedisResponse, String> {
+) -> Result<Response<String>, String> {
     let connections = state.connections.lock().unwrap();
 
     if let Some(conn_state) = connections.get(&connection_id) {
@@ -130,44 +181,20 @@ pub async fn get_key(
             Ok(mut conn) => {
                 let current_db = conn_state.current_db;
                 if let Err(e) = redis::cmd("SELECT").arg(current_db).query::<()>(&mut conn) {
-                    return Ok(RedisResponse {
-                        success: false,
-                        message: format!("切换到数据库 {} 失败: {}", current_db, e),
-                        value: None,
-                    });
+                    return Ok(Response::error(format!("切换到数据库 {} 失败: {}", current_db, e)));
                 }
 
                 // 使用 Option<String> 处理 nil 响应
                 match redis::cmd("GET").arg(&key).query::<Option<String>>(&mut conn) {
-                    Ok(Some(value)) => Ok(RedisResponse {
-                        success: true,
-                        message: format!("成功获取 {}", key),
-                        value: Some(value),
-                    }),
-                    Ok(None) => Ok(RedisResponse {
-                        success: true,
-                        message: format!("键 {} 存在但值为空", key),
-                        value: None,
-                    }),
-                    Err(e) => Ok(RedisResponse {
-                        success: false,
-                        message: format!("获取失败: {}", e),
-                        value: None,
-                    }),
+                    Ok(Some(value)) => Ok(Response::success_with_message(value, format!("成功获取 {}", key))),
+                    Ok(None) => Ok(Response::success_with_message("".to_string(), format!("键 {} 存在但值为空", key))),
+                    Err(e) => Ok(Response::error(format!("获取失败: {}", e))),
                 }
             }
-            Err(e) => Ok(RedisResponse {
-                success: false,
-                message: format!("获取连接失败: {}", e),
-                value: None,
-            }),
+            Err(e) => Ok(Response::error(format!("获取连接失败: {}", e))),
         }
     } else {
-        Ok(RedisResponse {
-            success: false,
-            message: "Redis 未连接".to_string(),
-            value: None,
-        })
+        Ok(Response::error("Redis 未连接".to_string()))
     }
 }
 
@@ -178,7 +205,7 @@ pub async fn get_keys(
     connection_id: String,
     pattern: String,
     state: State<'_, AppState>,
-) -> Result<KeysResponse, String> {
+) -> Result<Response<KeysListData>, String> {
     let connections = state.connections.lock().unwrap();
 
     if let Some(conn_state) = connections.get(&connection_id) {
@@ -186,12 +213,7 @@ pub async fn get_keys(
             Ok(mut conn) => {
                 let current_db = conn_state.current_db;
                 if let Err(e) = redis::cmd("SELECT").arg(current_db).query::<()>(&mut conn) {
-                    return Ok(KeysResponse {
-                        success: false,
-                        message: format!("切换到数据库 {} 失败: {}", current_db, e),
-                        keys: None,
-                        total: 0,
-                    });
+                    return Ok(Response::error(format!("切换到数据库 {} 失败: {}", current_db, e)));
                 }
 
                 // 使用 SCAN 命令分批获取键名
@@ -212,12 +234,7 @@ pub async fn get_keys(
                     let (new_cursor, keys): (u64, Vec<String>) = match cmd.query(&mut conn) {
                         Ok(r) => r,
                         Err(e) => {
-                            return Ok(KeysResponse {
-                                success: false,
-                                message: format!("SCAN命令失败: {}", e),
-                                keys: None,
-                                total: 0,
-                            })
+                            return Ok(Response::error(format!("SCAN命令失败: {}", e)))
                         }
                     };
 
@@ -241,12 +258,7 @@ pub async fn get_keys(
                     let key_types: Vec<String> = match pipe.query(&mut conn) {
                         Ok(types) => types,
                         Err(e) => {
-                            return Ok(KeysResponse {
-                                success: false,
-                                message: format!("批量获取键类型失败: {}", e),
-                                keys: None,
-                                total: 0,
-                            })
+                            return Ok(Response::error(format!("批量获取键类型失败: {}", e)))
                         }
                     };
 
@@ -266,27 +278,15 @@ pub async fn get_keys(
                     }
                 }
 
-                Ok(KeysResponse {
-                    success: true,
-                    message: "成功获取键列表".to_string(),
-                    keys: Some(keys_with_info),
+                Ok(Response::success(KeysListData {
+                    keys: keys_with_info,
                     total,
-                })
+                }))
             }
-            Err(e) => Ok(KeysResponse {
-                success: false,
-                message: format!("获取连接失败: {}", e),
-                keys: None,
-                total: 0,
-            }),
+            Err(e) => Ok(Response::error(format!("获取连接失败: {}", e))),
         }
     } else {
-        Ok(KeysResponse {
-            success: false,
-            message: "Redis 未连接".to_string(),
-            keys: None,
-            total: 0,
-        })
+        Ok(Response::error("Redis 未连接".to_string()))
     }
 }
 
@@ -295,7 +295,7 @@ pub async fn get_key_detail(
     connection_id: String,
     key: String,
     state: State<'_, AppState>,
-) -> Result<KeyDetailResponse, String> {
+) -> Result<Response<KeyDetail>, String> {
     let connections = state.connections.lock().unwrap();
 
     if let Some(conn_state) = connections.get(&connection_id) {
@@ -303,42 +303,26 @@ pub async fn get_key_detail(
             Ok(mut conn) => {
                 let current_db = conn_state.current_db;
                 if let Err(e) = redis::cmd("SELECT").arg(current_db).query::<()>(&mut conn) {
-                    return Ok(KeyDetailResponse {
-                        success: false,
-                        message: format!("切换到数据库 {} 失败: {}", current_db, e),
-                        detail: None,
-                    });
+                    return Ok(Response::error(format!("切换到数据库 {} 失败: {}", current_db, e)));
                 }
 
                 // 检查键是否存在
                 let exists: bool = match redis::cmd("EXISTS").arg(&key).query(&mut conn) {
                     Ok(exists) => exists,
                     Err(e) => {
-                        return Ok(KeyDetailResponse {
-                            success: false,
-                            message: format!("检查键存在失败: {}", e),
-                            detail: None,
-                        })
+                        return Ok(Response::error(format!("检查键存在失败: {}", e)))
                     }
                 };
 
                 if !exists {
-                    return Ok(KeyDetailResponse {
-                        success: false,
-                        message: format!("键 {} 不存在", key),
-                        detail: None,
-                    });
+                    return Ok(Response::error(format!("键 {} 不存在", key)));
                 }
 
                 // 获取键类型
                 let key_type = match redis::cmd("TYPE").arg(&key).query::<String>(&mut conn) {
                     Ok(t) => t,
                     Err(e) => {
-                        return Ok(KeyDetailResponse {
-                            success: false,
-                            message: format!("获取键类型失败: {}", e),
-                            detail: None,
-                        })
+                        return Ok(Response::error(format!("获取键类型失败: {}", e)))
                     }
                 };
 
@@ -346,11 +330,7 @@ pub async fn get_key_detail(
                 let ttl = match redis::cmd("TTL").arg(&key).query::<i64>(&mut conn) {
                     Ok(t) => t,
                     Err(e) => {
-                        return Ok(KeyDetailResponse {
-                            success: false,
-                            message: format!("获取TTL失败: {}", e),
-                            detail: None,
-                        })
+                        return Ok(Response::error(format!("获取TTL失败: {}", e)))
                     }
                 };
 
@@ -358,11 +338,7 @@ pub async fn get_key_detail(
                 let size = match get_key_size_internal(&mut conn, &key) {
                     Ok(s) => s,
                     Err(e) => {
-                        return Ok(KeyDetailResponse {
-                            success: false,
-                            message: format!("获取键大小失败: {}", e),
-                            detail: None,
-                        })
+                        return Ok(Response::error(format!("获取键大小失败: {}", e)))
                     }
                 };
 
@@ -383,11 +359,7 @@ pub async fn get_key_detail(
                         let val: String = match redis::cmd("GET").arg(&key).query(&mut conn) {
                             Ok(v) => v,
                             Err(e) => {
-                                return Ok(KeyDetailResponse {
-                                    success: false,
-                                    message: format!("获取字符串值失败: {}", e),
-                                    detail: None,
-                                })
+                                return Ok(Response::error(format!("获取字符串值失败: {}", e)))
                             }
                         };
                         json!(val)
@@ -396,11 +368,7 @@ pub async fn get_key_detail(
                         let val: Vec<(String, String)> = match redis::cmd("HGETALL").arg(&key).query(&mut conn) {
                             Ok(v) => v,
                             Err(e) => {
-                                return Ok(KeyDetailResponse {
-                                    success: false,
-                                    message: format!("获取哈希值失败: {}", e),
-                                    detail: None,
-                                })
+                                return Ok(Response::error(format!("获取哈希值失败: {}", e)))
                             }
                         };
                         let hash_items: Vec<serde_json::Value> = val.into_iter().map(|(field, value)| {
@@ -415,11 +383,7 @@ pub async fn get_key_detail(
                         let val: Vec<String> = match redis::cmd("LRANGE").arg(&key).arg(0).arg(-1).query(&mut conn) {
                             Ok(v) => v,
                             Err(e) => {
-                                return Ok(KeyDetailResponse {
-                                    success: false,
-                                    message: format!("获取列表值失败: {}", e),
-                                    detail: None,
-                                })
+                                return Ok(Response::error(format!("获取列表值失败: {}", e)))
                             }
                         };
                         json!(val)
@@ -428,11 +392,7 @@ pub async fn get_key_detail(
                         let val: Vec<String> = match redis::cmd("SMEMBERS").arg(&key).query(&mut conn) {
                             Ok(v) => v,
                             Err(e) => {
-                                return Ok(KeyDetailResponse {
-                                    success: false,
-                                    message: format!("获取集合值失败: {}", e),
-                                    detail: None,
-                                })
+                                return Ok(Response::error(format!("获取集合值失败: {}", e)))
                             }
                         };
                         json!(val)
@@ -441,11 +401,7 @@ pub async fn get_key_detail(
                         let val: Vec<(String, f64)> = match redis::cmd("ZRANGE").arg(&key).arg(0).arg(-1).arg("WITHSCORES").query(&mut conn) {
                             Ok(v) => v,
                             Err(e) => {
-                                return Ok(KeyDetailResponse {
-                                    success: false,
-                                    message: format!("获取有序集合值失败: {}", e),
-                                    detail: None,
-                                })
+                                return Ok(Response::error(format!("获取有序集合值失败: {}", e)))
                             }
                         };
                         let zset_items: Vec<serde_json::Value> = val.into_iter().map(|(value, score)| {
@@ -459,31 +415,19 @@ pub async fn get_key_detail(
                     _ => json!(null),
                 };
 
-                Ok(KeyDetailResponse {
-                    success: true,
-                    message: "成功获取键详情".to_string(),
-                    detail: Some(KeyDetail {
-                        key: key.clone(),
-                        key_type,
-                        ttl,
-                        size,
-                        create_time: create_time.to_rfc3339(),
-                        value,
-                    }),
-                })
+                Ok(Response::success(KeyDetail {
+                    key: key.clone(),
+                    key_type,
+                    ttl,
+                    size,
+                    create_time: create_time.to_rfc3339(),
+                    value,
+                }))
             }
-            Err(e) => Ok(KeyDetailResponse {
-                success: false,
-                message: format!("获取连接失败: {}", e),
-                detail: None,
-            }),
+            Err(e) => Ok(Response::error(format!("获取连接失败: {}", e))),
         }
     } else {
-        Ok(KeyDetailResponse {
-            success: false,
-            message: "Redis 未连接".to_string(),
-            detail: None,
-        })
+        Ok(Response::error("Redis 未连接".to_string()))
     }
 }
 
@@ -519,21 +463,21 @@ pub async fn get_key_type(
     connection_id: String,
     key: String,
     state: State<'_, AppState>,
-) -> Result<String, String> {
+) -> Result<Response<String>, String> {
     let connections = state.connections.lock().unwrap();
 
     if let Some(conn_state) = connections.get(&connection_id) {
         match conn_state.client.get_connection() {
             Ok(mut conn) => {
                 match redis::cmd("TYPE").arg(&key).query::<String>(&mut conn) {
-                    Ok(key_type) => Ok(key_type),
-                    Err(e) => Err(format!("获取键类型失败: {}", e)),
+                    Ok(key_type) => Ok(Response::success(key_type)),
+                    Err(e) => Ok(Response::error(format!("获取键类型失败: {}", e))),
                 }
             }
-            Err(e) => Err(format!("获取连接失败: {}", e)),
+            Err(e) => Ok(Response::error(format!("获取连接失败: {}", e))),
         }
     } else {
-        Err("Redis 未连接".to_string())
+        Ok(Response::error("Redis 未连接".to_string()))
     }
 }
 
@@ -543,21 +487,21 @@ pub async fn get_key_ttl(
     connection_id: String,
     key: String,
     state: State<'_, AppState>,
-) -> Result<i64, String> {
+) -> Result<Response<i64>, String> {
     let connections = state.connections.lock().unwrap();
 
     if let Some(conn_state) = connections.get(&connection_id) {
         match conn_state.client.get_connection() {
             Ok(mut conn) => {
                 match redis::cmd("TTL").arg(&key).query::<i64>(&mut conn) {
-                    Ok(ttl) => Ok(ttl),
-                    Err(e) => Err(format!("获取键 TTL 失败: {}", e)),
+                    Ok(ttl) => Ok(Response::success(ttl)),
+                    Err(e) => Ok(Response::error(format!("获取键 TTL 失败: {}", e))),
                 }
             }
-            Err(e) => Err(format!("获取连接失败: {}", e)),
+            Err(e) => Ok(Response::error(format!("获取连接失败: {}", e))),
         }
     } else {
-        Err("Redis 未连接".to_string())
+        Ok(Response::error("Redis 未连接".to_string()))
     }
 }
 
@@ -568,7 +512,7 @@ pub async fn set_key_ttl(
     key: String,
     ttl: i64,
     state: State<'_, AppState>,
-) -> Result<(), String> {
+) -> Result<Response<()>, String> {
     let connections = state.connections.lock().unwrap();
 
     if let Some(conn_state) = connections.get(&connection_id) {
@@ -578,30 +522,30 @@ pub async fn set_key_ttl(
                     match redis::cmd("EXPIRE").arg(&key).arg(ttl).query::<i64>(&mut conn) {
                         Ok(result) => {
                             if result == 1 {
-                                Ok(())
+                                Ok(Response::<()>::success_empty())
                             } else {
-                                Err("设置TTL失败".to_string())
+                                Ok(Response::error("设置TTL失败".to_string()))
                             }
                         }
-                        Err(e) => Err(format!("设置 TTL 失败: {}", e)),
+                        Err(e) => Ok(Response::error(format!("设置 TTL 失败: {}", e))),
                     }
                 } else {
                     match redis::cmd("PERSIST").arg(&key).query::<i64>(&mut conn) {
                         Ok(result) => {
                             if result == 1 {
-                                Ok(())
+                                Ok(Response::<()>::success_empty())
                             } else {
-                                Err("移除 TTL 失败".to_string())
+                                Ok(Response::error("移除 TTL 失败".to_string()))
                             }
                         }
-                        Err(e) => Err(format!("移除 TTL 失败: {}", e)),
+                        Err(e) => Ok(Response::error(format!("移除 TTL 失败: {}", e))),
                     }
                 }
             }
-            Err(e) => Err(format!("获取连接失败: {}", e)),
+            Err(e) => Ok(Response::error(format!("获取连接失败: {}", e))),
         }
     } else {
-        Err("Redis 未连接".to_string())
+        Ok(Response::error("Redis 未连接".to_string()))
     }
 }
 
@@ -611,18 +555,21 @@ pub async fn get_key_size(
     connection_id: String,
     key: String,
     state: State<'_, AppState>,
-) -> Result<usize, String> {
+) -> Result<Response<usize>, String> {
     let connections = state.connections.lock().unwrap();
 
     if let Some(conn_state) = connections.get(&connection_id) {
         match conn_state.client.get_connection() {
             Ok(mut conn) => {
-                get_key_size_internal(&mut conn, &key)
+                match get_key_size_internal(&mut conn, &key) {
+                    Ok(size) => Ok(Response::success(size)),
+                    Err(e) => Ok(Response::error(e)),
+                }
             }
-            Err(e) => Err(format!("获取连接失败: {}", e)),
+            Err(e) => Ok(Response::error(format!("获取连接失败: {}", e))),
         }
     } else {
-        Err("Redis 未连接".to_string())
+        Ok(Response::error("Redis 未连接".to_string()))
     }
 }
 
@@ -632,7 +579,7 @@ pub async fn delete_key(
     connection_id: String,
     key: String,
     state: State<'_, AppState>,
-) -> Result<(), String> {
+) -> Result<Response<()>, String> {
     let connections = state.connections.lock().unwrap();
 
     if let Some(conn_state) = connections.get(&connection_id) {
@@ -641,18 +588,18 @@ pub async fn delete_key(
                 match redis::cmd("DEL").arg(&key).query::<usize>(&mut conn) {
                     Ok(count) => {
                         if count > 0 {
-                            Ok(())
+                            Ok(Response::<()>::success_empty())
                         } else {
-                            Err("键不存在".to_string())
+                            Ok(Response::error("键不存在".to_string()))
                         }
                     }
-                    Err(e) => Err(format!("删除键失败: {}", e)),
+                    Err(e) => Ok(Response::error(format!("删除键失败: {}", e))),
                 }
             }
-            Err(e) => Err(format!("获取连接失败: {}", e)),
+            Err(e) => Ok(Response::error(format!("获取连接失败: {}", e))),
         }
     } else {
-        Err("Redis 未连接".to_string())
+        Ok(Response::error("Redis 未连接".to_string()))
     }
 }
 
@@ -664,7 +611,7 @@ pub async fn rename_key(
     old_key: String,
     new_key: String,
     state: State<'_, AppState>,
-) -> Result<RedisResponse, String> {
+) -> Result<Response<()>, String> {
     let connections = state.connections.lock().unwrap();
 
     if let Some(conn_state) = connections.get(&connection_id) {
@@ -675,30 +622,14 @@ pub async fn rename_key(
                     .arg(&new_key)
                     .query::<()>(&mut conn)
                 {
-                    Ok(_) => Ok(RedisResponse {
-                        success: true,
-                        message: format!("成功重命名 {} 为 {}", old_key, new_key),
-                        value: None,
-                    }),
-                    Err(e) => Ok(RedisResponse {
-                        success: false,
-                        message: format!("重命名失败: {}", e),
-                        value: None,
-                    }),
+                    Ok(_) => Ok(Response::<()>::success_empty_with_message(format!("成功重命名 {} 为 {}", old_key, new_key))),
+                    Err(e) => Ok(Response::error(format!("重命名失败: {}", e))),
                 }
             }
-            Err(e) => Ok(RedisResponse {
-                success: false,
-                message: format!("获取连接失败: {}", e),
-                value: None,
-            }),
+            Err(e) => Ok(Response::error(format!("获取连接失败: {}", e))),
         }
     } else {
-        Ok(RedisResponse {
-            success: false,
-            message: "Redis 未连接".to_string(),
-            value: None,
-        })
+        Ok(Response::error("Redis 未连接".to_string()))
     }
 }
 
@@ -710,42 +641,31 @@ pub async fn update_hash_field(
     field: String,
     value: String,
     state: State<'_, AppState>,
-) -> Result<RedisResponse, String> {
+) -> Result<Response<()>, String> {
     let connections = state.connections.lock().unwrap();
 
     if let Some(conn_state) = connections.get(&connection_id) {
         match conn_state.client.get_connection() {
             Ok(mut conn) => {
+                let current_db = conn_state.current_db;
+                if let Err(e) = redis::cmd("SELECT").arg(current_db).query::<()>(&mut conn) {
+                    return Ok(Response::error(format!("切换到数据库 {} 失败: {}", current_db, e)));
+                }
+
                 match redis::cmd("HSET")
                     .arg(&key)
                     .arg(&field)
                     .arg(&value)
                     .query::<i64>(&mut conn)
                 {
-                    Ok(_) => Ok(RedisResponse {
-                        success: true,
-                        message: format!("成功更新 {} 的字段 {}", key, field),
-                        value: None,
-                    }),
-                    Err(e) => Ok(RedisResponse {
-                        success: false,
-                        message: format!("更新失败: {}", e),
-                        value: None,
-                    }),
+                    Ok(_) => Ok(Response::<()>::success_empty_with_message(format!("成功更新 {} 的字段 {}", key, field))),
+                    Err(e) => Ok(Response::error(format!("更新失败: {}", e))),
                 }
             }
-            Err(e) => Ok(RedisResponse {
-                success: false,
-                message: format!("获取连接失败: {}", e),
-                value: None,
-            }),
+            Err(e) => Ok(Response::error(format!("获取连接失败: {}", e))),
         }
     } else {
-        Ok(RedisResponse {
-            success: false,
-            message: "Redis 未连接".to_string(),
-            value: None,
-        })
+        Ok(Response::error("Redis 未连接".to_string()))
     }
 }
 
@@ -756,12 +676,17 @@ pub async fn delete_hash_field(
     key: String,
     field: String,
     state: State<'_, AppState>,
-) -> Result<RedisResponse, String> {
+) -> Result<Response<()>, String> {
     let connections = state.connections.lock().unwrap();
 
     if let Some(conn_state) = connections.get(&connection_id) {
         match conn_state.client.get_connection() {
             Ok(mut conn) => {
+                let current_db = conn_state.current_db;
+                if let Err(e) = redis::cmd("SELECT").arg(current_db).query::<()>(&mut conn) {
+                    return Ok(Response::error(format!("切换到数据库 {} 失败: {}", current_db, e)));
+                }
+
                 match redis::cmd("HDEL")
                     .arg(&key)
                     .arg(&field)
@@ -769,38 +694,18 @@ pub async fn delete_hash_field(
                 {
                     Ok(count) => {
                         if count > 0 {
-                            Ok(RedisResponse {
-                                success: true,
-                                message: format!("成功删除 {} 的字段 {}", key, field),
-                                value: None,
-                            })
+                            Ok(Response::<()>::success_empty_with_message(format!("成功删除 {} 的字段 {}", key, field)))
                         } else {
-                            Ok(RedisResponse {
-                                success: false,
-                                message: format!("字段 {} 不存在", field),
-                                value: None,
-                            })
+                            Ok(Response::error(format!("字段 {} 不存在", field)))
                         }
                     }
-                    Err(e) => Ok(RedisResponse {
-                        success: false,
-                        message: format!("删除失败: {}", e),
-                        value: None,
-                    }),
+                    Err(e) => Ok(Response::error(format!("删除失败: {}", e))),
                 }
             }
-            Err(e) => Ok(RedisResponse {
-                success: false,
-                message: format!("获取连接失败: {}", e),
-                value: None,
-            }),
+            Err(e) => Ok(Response::error(format!("获取连接失败: {}", e))),
         }
     } else {
-        Ok(RedisResponse {
-            success: false,
-            message: "Redis 未连接".to_string(),
-            value: None,
-        })
+        Ok(Response::error("Redis 未连接".to_string()))
     }
 }
 
@@ -812,31 +717,28 @@ pub async fn update_list_item(
     index: i64,
     value: String,
     state: State<'_, AppState>,
-) -> Result<RedisResponse, String> {
+) -> Result<Response<()>, String> {
     let connections = state.connections.lock().unwrap();
 
     if let Some(conn_state) = connections.get(&connection_id) {
         match conn_state.client.get_connection() {
             Ok(mut conn) => {
+                let current_db = conn_state.current_db;
+                if let Err(e) = redis::cmd("SELECT").arg(current_db).query::<()>(&mut conn) {
+                    return Ok(Response::error(format!("切换到数据库 {} 失败: {}", current_db, e)));
+                }
+
                 // 获取列表长度
                 let len: i64 = match redis::cmd("LLEN").arg(&key).query(&mut conn) {
                     Ok(len) => len,
                     Err(e) => {
-                        return Ok(RedisResponse {
-                            success: false,
-                            message: format!("获取列表长度失败: {}", e),
-                            value: None,
-                        })
+                        return Ok(Response::error(format!("获取列表长度失败: {}", e)))
                     }
                 };
 
                 // 验证索引是否在有效范围内
                 if index >= len || index < -len {
-                    return Ok(RedisResponse {
-                        success: false,
-                        message: format!("索引 {} 超出范围，列表长度为 {}", index, len),
-                        value: None,
-                    });
+                    return Ok(Response::error(format!("索引 {} 超出范围，列表长度为 {}", index, len)));
                 }
 
                 // 处理负索引
@@ -853,30 +755,14 @@ pub async fn update_list_item(
                     .arg(&value)
                     .query::<()>(&mut conn)
                 {
-                    Ok(_) => Ok(RedisResponse {
-                        success: true,
-                        message: format!("成功更新 {} 的索引 {}", key, index),
-                        value: None,
-                    }),
-                    Err(e) => Ok(RedisResponse {
-                        success: false,
-                        message: format!("更新失败: {}", e),
-                        value: None,
-                    }),
+                    Ok(_) => Ok(Response::<()>::success_empty_with_message(format!("成功更新 {} 的索引 {}", key, index))),
+                    Err(e) => Ok(Response::error(format!("更新失败: {}", e))),
                 }
             }
-            Err(e) => Ok(RedisResponse {
-                success: false,
-                message: format!("获取连接失败: {}", e),
-                value: None,
-            }),
+            Err(e) => Ok(Response::error(format!("获取连接失败: {}", e))),
         }
     } else {
-        Ok(RedisResponse {
-            success: false,
-            message: "Redis 未连接".to_string(),
-            value: None,
-        })
+        Ok(Response::error("Redis 未连接".to_string()))
     }
 }
 
@@ -888,12 +774,17 @@ pub async fn delete_list_item(
     value: String,
     count: i64,
     state: State<'_, AppState>,
-) -> Result<RedisResponse, String> {
+) -> Result<Response<()>, String> {
     let connections = state.connections.lock().unwrap();
 
     if let Some(conn_state) = connections.get(&connection_id) {
         match conn_state.client.get_connection() {
             Ok(mut conn) => {
+                let current_db = conn_state.current_db;
+                if let Err(e) = redis::cmd("SELECT").arg(current_db).query::<()>(&mut conn) {
+                    return Ok(Response::error(format!("切换到数据库 {} 失败: {}", current_db, e)));
+                }
+
                 match redis::cmd("LREM")
                     .arg(&key)
                     .arg(count)
@@ -902,38 +793,18 @@ pub async fn delete_list_item(
                 {
                     Ok(removed_count) => {
                         if removed_count > 0 {
-                            Ok(RedisResponse {
-                                success: true,
-                                message: format!("成功删除 {} 个元素", removed_count),
-                                value: None,
-                            })
+                            Ok(Response::<()>::success_empty_with_message(format!("成功删除 {} 个元素", removed_count)))
                         } else {
-                            Ok(RedisResponse {
-                                success: false,
-                                message: "未找到匹配的元素".to_string(),
-                                value: None,
-                            })
+                            Ok(Response::error("未找到匹配的元素".to_string()))
                         }
                     }
-                    Err(e) => Ok(RedisResponse {
-                        success: false,
-                        message: format!("删除失败: {}", e),
-                        value: None,
-                    }),
+                    Err(e) => Ok(Response::error(format!("删除失败: {}", e))),
                 }
             }
-            Err(e) => Ok(RedisResponse {
-                success: false,
-                message: format!("获取连接失败: {}", e),
-                value: None,
-            }),
+            Err(e) => Ok(Response::error(format!("获取连接失败: {}", e))),
         }
     } else {
-        Ok(RedisResponse {
-            success: false,
-            message: "Redis 未连接".to_string(),
-            value: None,
-        })
+        Ok(Response::error("Redis 未连接".to_string()))
     }
 }
 
@@ -944,41 +815,30 @@ pub async fn append_list_item(
     key: String,
     value: String,
     state: State<'_, AppState>,
-) -> Result<RedisResponse, String> {
+) -> Result<Response<()>, String> {
     let connections = state.connections.lock().unwrap();
 
     if let Some(conn_state) = connections.get(&connection_id) {
         match conn_state.client.get_connection() {
             Ok(mut conn) => {
+                let current_db = conn_state.current_db;
+                if let Err(e) = redis::cmd("SELECT").arg(current_db).query::<()>(&mut conn) {
+                    return Ok(Response::error(format!("切换到数据库 {} 失败: {}", current_db, e)));
+                }
+
                 match redis::cmd("RPUSH")
                     .arg(&key)
                     .arg(&value)
                     .query::<i64>(&mut conn)
                 {
-                    Ok(new_len) => Ok(RedisResponse {
-                        success: true,
-                        message: format!("成功在列表 {} 末尾添加元素，新长度: {}", key, new_len),
-                        value: None,
-                    }),
-                    Err(e) => Ok(RedisResponse {
-                        success: false,
-                        message: format!("添加失败: {}", e),
-                        value: None,
-                    }),
+                    Ok(new_len) => Ok(Response::<()>::success_empty_with_message(format!("成功在列表 {} 末尾添加元素，新长度: {}", key, new_len))),
+                    Err(e) => Ok(Response::error(format!("添加失败: {}", e))),
                 }
             }
-            Err(e) => Ok(RedisResponse {
-                success: false,
-                message: format!("获取连接失败: {}", e),
-                value: None,
-            }),
+            Err(e) => Ok(Response::error(format!("获取连接失败: {}", e))),
         }
     } else {
-        Ok(RedisResponse {
-            success: false,
-            message: "Redis 未连接".to_string(),
-            value: None,
-        })
+        Ok(Response::error("Redis 未连接".to_string()))
     }
 }
 
@@ -989,12 +849,17 @@ pub async fn add_set_item(
     key: String,
     value: String,
     state: State<'_, AppState>,
-) -> Result<RedisResponse, String> {
+) -> Result<Response<()>, String> {
     let connections = state.connections.lock().unwrap();
 
     if let Some(conn_state) = connections.get(&connection_id) {
         match conn_state.client.get_connection() {
             Ok(mut conn) => {
+                let current_db = conn_state.current_db;
+                if let Err(e) = redis::cmd("SELECT").arg(current_db).query::<()>(&mut conn) {
+                    return Ok(Response::error(format!("切换到数据库 {} 失败: {}", current_db, e)));
+                }
+
                 match redis::cmd("SADD")
                     .arg(&key)
                     .arg(&value)
@@ -1002,38 +867,18 @@ pub async fn add_set_item(
                 {
                     Ok(count) => {
                         if count > 0 {
-                            Ok(RedisResponse {
-                                success: true,
-                                message: format!("成功添加元素到集合 {}", key),
-                                value: None,
-                            })
+                            Ok(Response::<()>::success_empty_with_message(format!("成功添加元素到集合 {}", key)))
                         } else {
-                            Ok(RedisResponse {
-                                success: false,
-                                message: "元素已存在".to_string(),
-                                value: None,
-                            })
+                            Ok(Response::error("元素已存在".to_string()))
                         }
                     }
-                    Err(e) => Ok(RedisResponse {
-                        success: false,
-                        message: format!("添加失败: {}", e),
-                        value: None,
-                    }),
+                    Err(e) => Ok(Response::error(format!("添加失败: {}", e))),
                 }
             }
-            Err(e) => Ok(RedisResponse {
-                success: false,
-                message: format!("获取连接失败: {}", e),
-                value: None,
-            }),
+            Err(e) => Ok(Response::error(format!("获取连接失败: {}", e))),
         }
     } else {
-        Ok(RedisResponse {
-            success: false,
-            message: "Redis 未连接".to_string(),
-            value: None,
-        })
+        Ok(Response::error("Redis 未连接".to_string()))
     }
 }
 
@@ -1044,12 +889,17 @@ pub async fn delete_set_item(
     key: String,
     value: String,
     state: State<'_, AppState>,
-) -> Result<RedisResponse, String> {
+) -> Result<Response<()>, String> {
     let connections = state.connections.lock().unwrap();
 
     if let Some(conn_state) = connections.get(&connection_id) {
         match conn_state.client.get_connection() {
             Ok(mut conn) => {
+                let current_db = conn_state.current_db;
+                if let Err(e) = redis::cmd("SELECT").arg(current_db).query::<()>(&mut conn) {
+                    return Ok(Response::error(format!("切换到数据库 {} 失败: {}", current_db, e)));
+                }
+
                 match redis::cmd("SREM")
                     .arg(&key)
                     .arg(&value)
@@ -1057,38 +907,18 @@ pub async fn delete_set_item(
                 {
                     Ok(count) => {
                         if count > 0 {
-                            Ok(RedisResponse {
-                                success: true,
-                                message: format!("成功从集合 {} 删除元素", key),
-                                value: None,
-                            })
+                            Ok(Response::<()>::success_empty_with_message(format!("成功从集合 {} 删除元素", key)))
                         } else {
-                            Ok(RedisResponse {
-                                success: false,
-                                message: "元素不存在".to_string(),
-                                value: None,
-                            })
+                            Ok(Response::error("元素不存在".to_string()))
                         }
                     }
-                    Err(e) => Ok(RedisResponse {
-                        success: false,
-                        message: format!("删除失败: {}", e),
-                        value: None,
-                    }),
+                    Err(e) => Ok(Response::error(format!("删除失败: {}", e))),
                 }
             }
-            Err(e) => Ok(RedisResponse {
-                success: false,
-                message: format!("获取连接失败: {}", e),
-                value: None,
-            }),
+            Err(e) => Ok(Response::error(format!("获取连接失败: {}", e))),
         }
     } else {
-        Ok(RedisResponse {
-            success: false,
-            message: "Redis 未连接".to_string(),
-            value: None,
-        })
+        Ok(Response::error("Redis 未连接".to_string()))
     }
 }
 
@@ -1100,12 +930,17 @@ pub async fn add_zset_item(
     score: f64,
     value: String,
     state: State<'_, AppState>,
-) -> Result<RedisResponse, String> {
+) -> Result<Response<()>, String> {
     let connections = state.connections.lock().unwrap();
 
     if let Some(conn_state) = connections.get(&connection_id) {
         match conn_state.client.get_connection() {
             Ok(mut conn) => {
+                let current_db = conn_state.current_db;
+                if let Err(e) = redis::cmd("SELECT").arg(current_db).query::<()>(&mut conn) {
+                    return Ok(Response::error(format!("切换到数据库 {} 失败: {}", current_db, e)));
+                }
+
                 match redis::cmd("ZADD")
                     .arg(&key)
                     .arg(score)
@@ -1114,38 +949,18 @@ pub async fn add_zset_item(
                 {
                     Ok(count) => {
                         if count > 0 {
-                            Ok(RedisResponse {
-                                success: true,
-                                message: format!("成功添加元素到有序集合 {}", key),
-                                value: None,
-                            })
+                            Ok(Response::<()>::success_empty_with_message(format!("成功添加元素到有序集合 {}", key)))
                         } else {
-                            Ok(RedisResponse {
-                                success: false,
-                                message: "元素已存在".to_string(),
-                                value: None,
-                            })
+                            Ok(Response::error("元素已存在".to_string()))
                         }
                     }
-                    Err(e) => Ok(RedisResponse {
-                        success: false,
-                        message: format!("添加失败: {}", e),
-                        value: None,
-                    }),
+                    Err(e) => Ok(Response::error(format!("添加失败: {}", e))),
                 }
             }
-            Err(e) => Ok(RedisResponse {
-                success: false,
-                message: format!("获取连接失败: {}", e),
-                value: None,
-            }),
+            Err(e) => Ok(Response::error(format!("获取连接失败: {}", e))),
         }
     } else {
-        Ok(RedisResponse {
-            success: false,
-            message: "Redis 未连接".to_string(),
-            value: None,
-        })
+        Ok(Response::error("Redis 未连接".to_string()))
     }
 }
 
@@ -1156,12 +971,17 @@ pub async fn delete_zset_item(
     key: String,
     value: String,
     state: State<'_, AppState>,
-) -> Result<RedisResponse, String> {
+) -> Result<Response<()>, String> {
     let connections = state.connections.lock().unwrap();
 
     if let Some(conn_state) = connections.get(&connection_id) {
         match conn_state.client.get_connection() {
             Ok(mut conn) => {
+                let current_db = conn_state.current_db;
+                if let Err(e) = redis::cmd("SELECT").arg(current_db).query::<()>(&mut conn) {
+                    return Ok(Response::error(format!("切换到数据库 {} 失败: {}", current_db, e)));
+                }
+
                 match redis::cmd("ZREM")
                     .arg(&key)
                     .arg(&value)
@@ -1169,37 +989,17 @@ pub async fn delete_zset_item(
                 {
                     Ok(count) => {
                         if count > 0 {
-                            Ok(RedisResponse {
-                                success: true,
-                                message: format!("成功从有序集合 {} 删除元素", key),
-                                value: None,
-                            })
+                            Ok(Response::<()>::success_empty_with_message(format!("成功从有序集合 {} 删除元素", key)))
                         } else {
-                            Ok(RedisResponse {
-                                success: false,
-                                message: "元素不存在".to_string(),
-                                value: None,
-                            })
+                            Ok(Response::error("元素不存在".to_string()))
                         }
                     }
-                    Err(e) => Ok(RedisResponse {
-                        success: false,
-                        message: format!("删除失败: {}", e),
-                        value: None,
-                    }),
+                    Err(e) => Ok(Response::error(format!("删除失败: {}", e))),
                 }
             }
-            Err(e) => Ok(RedisResponse {
-                success: false,
-                message: format!("获取连接失败: {}", e),
-                value: None,
-            }),
+            Err(e) => Ok(Response::error(format!("获取连接失败: {}", e))),
         }
     } else {
-        Ok(RedisResponse {
-            success: false,
-            message: "Redis 未连接".to_string(),
-            value: None,
-        })
+        Ok(Response::error("Redis 未连接".to_string()))
     }
 }

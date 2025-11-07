@@ -1,12 +1,20 @@
 use crate::state::AppState;
+use crate::commands::response::Response;
 use tauri::State;
+use serde::Serialize;
+
+#[derive(Debug, Serialize)]
+pub struct DbKeyCount {
+    pub db_index: u8,
+    pub key_count: usize,
+}
 
 // 获取数据库数量
 #[tauri::command]
 pub async fn get_db_count(
     connection_id: String,
     state: State<'_, AppState>,
-) -> Result<usize, String> {
+) -> Result<Response<usize>, String> {
     let connections = state.connections.lock().unwrap();
 
     if let Some(conn_state) = connections.get(&connection_id) {
@@ -14,19 +22,20 @@ pub async fn get_db_count(
             Ok(mut conn) => {
                 match redis::cmd("CONFIG").arg("GET").arg("databases").query::<Vec<String>>(&mut conn) {
                     Ok(config) => {
-                        if config.len() >= 2 {
-                            config[1].parse::<usize>().map_err(|e| e.to_string())
+                        let count = if config.len() >= 2 {
+                            config[1].parse::<usize>().unwrap_or(16)
                         } else {
-                            Ok(16) // 默认16个数据库
-                        }
+                            16 // 默认16个数据库
+                        };
+                        Ok(Response::success(count))
                     }
-                    Err(e) => Err(format!("获取数据库数量失败: {}", e)),
+                    Err(e) => Ok(Response::error(format!("获取数据库数量失败: {}", e))),
                 }
             }
-            Err(e) => Err(format!("获取连接失败: {}", e)),
+            Err(e) => Ok(Response::error(format!("获取连接失败: {}", e))),
         }
     } else {
-        Err("Redis 未连接".to_string())
+        Ok(Response::error("Redis 未连接".to_string()))
     }
 }
 
@@ -36,7 +45,7 @@ pub async fn get_db_key_count(
     connection_id: String,
     db_index: u8,
     state: State<'_, AppState>,
-) -> Result<usize, String> {
+) -> Result<Response<usize>, String> {
     let connections = state.connections.lock().unwrap();
 
     if let Some(conn_state) = connections.get(&connection_id) {
@@ -60,14 +69,14 @@ pub async fn get_db_key_count(
                 }
 
                 match result {
-                    Ok(count) => Ok(count),
-                    Err(e) => Err(format!("获取键数量失败: {}", e)),
+                    Ok(count) => Ok(Response::success(count)),
+                    Err(e) => Ok(Response::error(format!("获取键数量失败: {}", e))),
                 }
             }
-            Err(e) => Err(format!("获取连接失败: {}", e)),
+            Err(e) => Ok(Response::error(format!("获取连接失败: {}", e))),
         }
     } else {
-        Err("Redis 未连接".to_string())
+        Ok(Response::error("Redis 未连接".to_string()))
     }
 }
 
@@ -77,7 +86,7 @@ pub async fn get_all_db_key_counts(
     connection_id: String,
     db_count: usize,
     state: State<'_, AppState>,
-) -> Result<Vec<(u8, usize)>, String> {
+) -> Result<Response<Vec<DbKeyCount>>, String> {
     let connections = state.connections.lock().unwrap();
 
     if let Some(conn_state) = connections.get(&connection_id) {
@@ -94,15 +103,22 @@ pub async fn get_all_db_key_counts(
                         .query::<()>(&mut conn)
                     {
                         // 如果切换失败，记录为0
-                        results.push((db_index as u8, 0));
+                        results.push(DbKeyCount {
+                            db_index: db_index as u8,
+                            key_count: 0,
+                        });
                         continue;
                     }
 
                     // 获取键数量
-                    match redis::cmd("DBSIZE").query::<usize>(&mut conn) {
-                        Ok(count) => results.push((db_index as u8, count)),
-                        Err(_) => results.push((db_index as u8, 0)),
-                    }
+                    let count = match redis::cmd("DBSIZE").query::<usize>(&mut conn) {
+                        Ok(count) => count,
+                        Err(_) => 0,
+                    };
+                    results.push(DbKeyCount {
+                        db_index: db_index as u8,
+                        key_count: count,
+                    });
                 }
 
                 // 切换回原来的数据库
@@ -113,12 +129,12 @@ pub async fn get_all_db_key_counts(
                         .ok();
                 }
 
-                Ok(results)
+                Ok(Response::success(results))
             }
-            Err(e) => Err(format!("获取连接失败: {}", e)),
+            Err(e) => Ok(Response::error(format!("获取连接失败: {}", e))),
         }
     } else {
-        Err("Redis 未连接".to_string())
+        Ok(Response::error("Redis 未连接".to_string()))
     }
 }
 
@@ -128,7 +144,7 @@ pub async fn select_db(
     connection_id: String,
     db_index: u8,
     state: State<'_, AppState>,
-) -> Result<(), String> {
+) -> Result<Response<()>, String> {
     let mut connections = state.connections.lock().unwrap();
 
     if let Some(conn_state) = connections.get_mut(&connection_id) {
@@ -137,14 +153,14 @@ pub async fn select_db(
                 match redis::cmd("SELECT").arg(db_index).query::<()>(&mut conn) {
                     Ok(_) => {
                         conn_state.current_db = db_index;
-                        Ok(())
+                        Ok(Response::<()>::success_empty_with_message(format!("成功切换到数据库 {}", db_index)))
                     }
-                    Err(e) => Err(format!("切换数据库失败: {}", e)),
+                    Err(e) => Ok(Response::error(format!("切换数据库失败: {}", e))),
                 }
             }
-            Err(e) => Err(format!("获取连接失败: {}", e)),
+            Err(e) => Ok(Response::error(format!("获取连接失败: {}", e))),
         }
     } else {
-        Err("Redis 未连接".to_string())
+        Ok(Response::error("Redis 未连接".to_string()))
     }
 }
