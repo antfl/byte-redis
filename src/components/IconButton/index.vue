@@ -17,7 +17,7 @@ const iconButtonProps = defineProps({
     <div
       class="cursor-pointer rd-3px px-8px h-28px flex items-center justify-center"
       :class="{
-      'hover:bg-#f0f0f0': true
+      'hover:bg-[var(--color-fill-tertiary)]': true
     }"
     >
       <slot/>

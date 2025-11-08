@@ -23,16 +23,16 @@ const emit = defineEmits(["click"]);
     :tooltip="menuItemProps.item?.tooltip"
     class="size-30px"
     :class="{
-      'bg-#f0f0f0': menuItemProps.active,
-      'hover:bg-#f5f5f5': !menuItemProps.active
+      'bg-[var(--color-primary-bg)]': menuItemProps.active,
+      'hover:bg-[var(--color-fill-tertiary)]': !menuItemProps.active
     }"
   >
     <component
       :is="menuItemProps.item.icon"
       class="font-size-18px"
       :class="{
-        'text-#1890ff': menuItemProps.active,
-        'text-#1e1f22': !menuItemProps.active
+        'text-[var(--color-primary)]': menuItemProps.active,
+        'text-[var(--color-text)]': !menuItemProps.active
       }"
     />
   </IconButton>

@@ -48,23 +48,23 @@ const handleAction = (action: ActionType) => {
 		>
 			<a-menu :selectable="false">
 				<a-menu-item key="reconnect" @click="handleAction('reconnect')">
-					重新连接
+					重新
 				</a-menu-item>
 				<a-menu-item key="disconnect" @click="handleAction('disconnect')">
-					断开连接
+					断开
 				</a-menu-item>
 				<a-menu-item key="edit" @click="handleAction('edit')">
-					编辑连接
+					编辑
 				</a-menu-item>
-				<a-menu-item key="delete" danger @click="handleAction('delete')">
-					删除连接
+				<a-menu-item key="delete" @click="handleAction('delete')">
+					删除
 				</a-menu-item>
 			</a-menu>
 		</div>
 	</Teleport>
 </template>
 
-<style scoped>
+<style scoped lang="less">
 .connection-context-menu {
 	position: fixed;
 	z-index: 3000;
@@ -72,6 +72,10 @@ const handleAction = (action: ActionType) => {
 	box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
 	border-radius: 6px;
 	overflow: hidden;
+  :deep(.ant-menu-item) {
+    height: 32px;
+    line-height: 32px;
+  }
 }
 </style>
 

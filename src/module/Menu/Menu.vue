@@ -23,10 +23,10 @@ const handleClick = (item) => {
       <div>
         <a-menu @click="handleClick">
           <a-menu-item  key="settings">
-            <SettingOutlined /> 设置
+            设置
           </a-menu-item>
           <a-menu-item key="exit">
-            <SwapRightOutlined /> 退出
+            退出
           </a-menu-item>
         </a-menu>
       </div>

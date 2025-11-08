@@ -230,7 +230,7 @@ watch(
             :key="db.index.toString()"
             @click="selectDatabase(db.index)"
           >
-            <span class="color-#1e1f22">{{ formatDbName(db.index) }}</span>
+            <span>{{ formatDbName(db.index) }}</span>
             <span class="ml-8px">[{{ db.keyCount }}]</span>
           </a-menu-item>
         </template>
