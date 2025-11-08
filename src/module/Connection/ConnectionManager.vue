@@ -41,7 +41,7 @@ const activeConnection = computed(() => connectionStore.activeConnection);
     </IconButton>
     <template #overlay>
       <div>
-        <a-menu>
+        <a-menu :selectedKeys="activeConnection ? [activeConnection.id] : []">
           <a-menu-item key="1" @click="newConnection">
             <PlusOutlined/>
             <span class="ml-5px">新建连接</span>

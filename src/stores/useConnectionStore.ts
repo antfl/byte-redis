@@ -40,7 +40,7 @@ export const useConnectionStore = defineStore("connection", () => {
 
 		connections.value.push(newConnection);
 		trigger.value++;
-		saveToLocalStorage();
+		setActiveConnection(newConnection.id);
 	};
 
 	const updateConnection = (
