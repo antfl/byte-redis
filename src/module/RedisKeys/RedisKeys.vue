@@ -34,6 +34,7 @@ interface TreeNode {
 	icon?: any;
 	length?: number;
 	root?: boolean;
+	selectable?: boolean;
 }
 
 interface ConnectionConfig {
@@ -190,6 +191,13 @@ const applyKeyTree = () => {
 	fullTreeData.value = buildKeyTree(rawKeys.value, useSeparator.value ? currentSeparator.value : null);
 };
 
+const handleNodeClick = (_event: MouseEvent, node: any) => {
+	const rawNode: TreeNode | undefined = node?.rawNode || node;
+	if (rawNode?.value?.key) {
+		connectionStore.setCurrentKey(rawNode.value.key);
+	}
+};
+
 watch([useSeparator, currentSeparator], () => {
 	if (!rawKeys.value.length) {
 		fullTreeData.value = [];
@@ -217,6 +225,7 @@ function buildKeyTree(keys: KeyItem[], separator: string | null = ":"): TreeNode
 			isLeaf: true,
 			value: item,
 			root: true,
+			selectable: true,
 		}));
 
 		flatNodes.sort((a, b) => a.title.localeCompare(b.title));
@@ -243,6 +252,7 @@ function buildKeyTree(keys: KeyItem[], separator: string | null = ":"): TreeNode
 					isLeaf,
 					value: isLeaf ? item : undefined,
 					root: i === 0,
+					selectable: isLeaf,
 				};
 
 				keyMap[currentPath] = newNode;
@@ -281,11 +291,11 @@ function buildKeyTree(keys: KeyItem[], separator: string | null = ":"): TreeNode
 	return root.children || [];
 }
 
-const selectKey = async (_selectedKeys: string[], info: { node: TreeNode }) => {
-	if (info.node.isLeaf && info.node.value) {
-		connectionStore.setCurrentKey(info.node.value.key);
-	} else {
-		connectionStore.setCurrentKey(null);
+const selectKey = async (_selectedKeys: string[], info: { node: any }) => {
+	const rawNode: TreeNode | undefined = info.node?.rawNode || info.node;
+
+	if (rawNode?.value?.key) {
+		connectionStore.setCurrentKey(rawNode.value.key);
 	}
 };
 
@@ -414,6 +424,7 @@ const showImportModal = () => {
         v-if="genData.length > 0"
         :tree-data="genData"
         @select="selectKey"
+        @click="handleNodeClick"
         :height="redisKeyTreeHeight"
       >
         <template #switcherIcon="{ switcherCls }">

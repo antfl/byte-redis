@@ -21,6 +21,7 @@ export const useConnectionStore = defineStore("connection", () => {
 	const keyListRefreshTrigger: Ref<number> = ref(0);
 
 	const currentKey = ref<string | null>(null);
+	const currentKeyVersion = ref<number>(0);
 	const currentKeyCount = ref<number>(0);
 
 	const activeConnection: ComputedRef<Connection | null> = computed(() => {
@@ -78,6 +79,7 @@ export const useConnectionStore = defineStore("connection", () => {
 
 	const setCurrentKey = (key: string | null) => {
 		currentKey.value = key;
+		currentKeyVersion.value++;
 	};
 
 	const setCurrentKeyCount = (count: number) => {
@@ -177,6 +179,7 @@ export const useConnectionStore = defineStore("connection", () => {
 		currentDbIndex,
 		trigger,
 		keyListRefreshTrigger,
+		currentKeyVersion,
 
 		activeConnection,
 		connectionCount,

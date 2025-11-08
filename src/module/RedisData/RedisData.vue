@@ -144,7 +144,11 @@ const loadKeyDetail = async () => {
 	}
 };
 
-watch(() => connectionStore.currentKey, loadKeyDetail, { immediate: true });
+watch(
+	[() => connectionStore.currentKey, () => connectionStore.currentKeyVersion],
+	() => loadKeyDetail(),
+	{ immediate: true },
+);
 
 const copyKey = () => {
 	const { copy } = useClipboard();
@@ -202,7 +206,7 @@ const handleRenameKey = async () => {
 
 		if (res.success) {
 			keyData.key = newKeyName.value;
-			connectionStore.currentKey = newKeyName.value;
+			connectionStore.setCurrentKey(newKeyName.value);
 			// 刷新左侧 key 列表
 			connectionStore.refreshKeyList();
 			message.success(res.message || "Key名称已更新");
@@ -234,6 +238,7 @@ const handleUpdateTTL = async () => {
 			keyData.ttl = ttlValue;
 			message.success(res.message || "TTL已更新");
 			ttlModalVisible.value = false;
+			await loadKeyDetail();
 		} else {
 			message.error(res.message || "更新TTL失败");
 		}
@@ -256,7 +261,7 @@ const handleDeleteKey = async () => {
 
 		if (res.success) {
 			message.success(res.message || `Key "${keyData.key}" 已删除`);
-			connectionStore.currentKey = null;
+			connectionStore.setCurrentKey(null);
 			// 刷新左侧 key 列表
 			connectionStore.refreshKeyList();
 		} else {
