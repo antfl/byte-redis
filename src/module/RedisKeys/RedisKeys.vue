@@ -139,6 +139,8 @@ const init = async (config: ConnectionConfig, skipConnect = false) => {
 	if (!config) {
 		return;
 	}
+	connectionStore.setCurrentKey(null);
+	connectionStore.setCurrentKeyCount(0);
 	isLoading.value = true;
 	fullTreeData.value = [];
 	try {
@@ -159,10 +161,12 @@ const init = async (config: ConnectionConfig, skipConnect = false) => {
 
 		const keysRes = await getKeys(config.id, "*");
 		if (!keysRes.success || !keysRes.data) {
+			connectionStore.setCurrentKeyCount(0);
 			message.error(keysRes.message || "获取键列表失败");
 			return;
 		}
 
+		connectionStore.setCurrentKeyCount(keysRes.data.total ?? keysRes.data.keys.length ?? 0);
 		fullTreeData.value = buildKeyTree(keysRes.data.keys, ":");
 		setTreeHeight();
 	} catch (error) {
@@ -241,7 +245,7 @@ function buildKeyTree(keys: KeyItem[], separator = ":"): TreeNode[] {
 }
 
 const selectKey = async (selectedKeys: string[]) => {
-	connectionStore.setCurrentKey(selectedKeys[0]);
+	connectionStore.setCurrentKey(selectedKeys[0] ?? null);
 };
 
 const AddKeyModalRef = ref();

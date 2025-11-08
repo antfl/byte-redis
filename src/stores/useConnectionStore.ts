@@ -19,7 +19,8 @@ export const useConnectionStore = defineStore("connection", () => {
 	const trigger: Ref<number> = ref(0);
 	const keyListRefreshTrigger: Ref<number> = ref(0);
 
-	const currentKey = ref();
+	const currentKey = ref<string | null>(null);
+	const currentKeyCount = ref<number>(0);
 
 	const activeConnection: ComputedRef<Connection | null> = computed(() => {
 		if (!activeConnectionId.value) return null;
@@ -72,8 +73,17 @@ export const useConnectionStore = defineStore("connection", () => {
 		}
 	};
 
-	const setCurrentKey = (key: string) => {
+	const setCurrentKey = (key: string | null) => {
 		currentKey.value = key;
+	};
+
+	const setCurrentKeyCount = (count: number) => {
+		currentKeyCount.value = count;
+	};
+
+	const resetKeyState = () => {
+		currentKey.value = null;
+		currentKeyCount.value = 0;
 	};
 
 	const setActiveConnection = (id: string | null): void => {
@@ -90,6 +100,7 @@ export const useConnectionStore = defineStore("connection", () => {
 		} else {
 			currentDbIndex.value = 0;
 		}
+		resetKeyState();
 		trigger.value++;
 		saveToLocalStorage();
 	};
@@ -154,6 +165,7 @@ export const useConnectionStore = defineStore("connection", () => {
 
 	return {
 		currentKey,
+		currentKeyCount,
 		connections,
 		activeConnectionId,
 		currentDbIndex,
@@ -174,5 +186,7 @@ export const useConnectionStore = defineStore("connection", () => {
 		saveToLocalStorage,
 		loadFromLocalStorage,
 		setCurrentKey,
+		setCurrentKeyCount,
+		resetKeyState,
 	};
 });
