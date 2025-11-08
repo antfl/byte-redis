@@ -74,6 +74,16 @@ const isEditingHashField = ref(false);
 const hashFieldModalTitle = ref("添加字段");
 const hashField = reactive({ field: "", value: "" });
 
+const isHashItem = (record: unknown): record is HashItem => {
+	if (!record || typeof record !== "object") {
+		return false;
+	}
+
+	const candidate = record as Partial<HashItem>;
+
+	return typeof candidate.field === "string" && typeof candidate.value === "string";
+};
+
 const showAddHashFieldModal = () => {
 	hashField.field = "";
 	hashField.value = "";
@@ -82,7 +92,11 @@ const showAddHashFieldModal = () => {
 	hashFieldModalVisible.value = true;
 };
 
-const editHashField = (record: HashItem) => {
+const editHashField = (record: unknown) => {
+	if (!isHashItem(record)) {
+		return;
+	}
+
 	hashField.field = record.field;
 	hashField.value = record.value;
 	isEditingHashField.value = true;

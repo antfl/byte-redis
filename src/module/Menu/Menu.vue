@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { SettingOutlined, SwapRightOutlined } from '@ant-design/icons-vue';
+import type { MenuProps } from 'ant-design-vue';
 import menu from "@/assets/svg/menu.svg";
 import IconButton from "@/components/IconButton/index.vue";
 import Settings from "@/module/Settings/SettingsModal.vue";
 
 const SettingsRef = ref()
 
-const handleClick = (item) => {
+const handleClick: MenuProps['onClick'] = (item) => {
   if(item.key === "settings") {
     SettingsRef.value.open();
   }

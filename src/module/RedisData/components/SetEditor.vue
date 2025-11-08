@@ -72,6 +72,14 @@ const setItemModalVisible = ref(false);
 const setItemModalTitle = ref("添加元素");
 const setItem = reactive({ value: "", originalValue: "" });
 
+const isSetItem = (record: unknown): record is SetItem => {
+	if (!record || typeof record !== "object") {
+		return false;
+	}
+
+	return typeof (record as Partial<SetItem>).value === "string";
+};
+
 const showAddSetItemModal = () => {
 	setItem.value = "";
 	setItem.originalValue = "";
@@ -79,7 +87,11 @@ const showAddSetItemModal = () => {
 	setItemModalVisible.value = true;
 };
 
-const editSetItem = (record: SetItem) => {
+const editSetItem = (record: unknown) => {
+	if (!isSetItem(record)) {
+		return;
+	}
+
 	setItem.value = record.value;
 	setItem.originalValue = record.value;
 	setItemModalTitle.value = "修改元素";

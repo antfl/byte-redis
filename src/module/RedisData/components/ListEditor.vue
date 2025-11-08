@@ -74,6 +74,16 @@ const listItemModalVisible = ref(false);
 const listItemModalTitle = ref("添加元素");
 const listItem = reactive({ value: "", index: -1 });
 
+const isListItem = (record: unknown): record is ListItem => {
+	if (!record || typeof record !== "object") {
+		return false;
+	}
+
+	const candidate = record as Partial<ListItem>;
+
+	return typeof candidate.index === "number" && typeof candidate.value === "string";
+};
+
 const showAddListItemModal = () => {
 	listItem.value = "";
 	listItem.index = -1;
@@ -81,7 +91,11 @@ const showAddListItemModal = () => {
 	listItemModalVisible.value = true;
 };
 
-const editListItem = (record: ListItem) => {
+const editListItem = (record: unknown) => {
+	if (!isListItem(record)) {
+		return;
+	}
+
 	listItem.value = record.value;
 	listItem.index = record.index;
 	listItemModalTitle.value = "修改元素";
@@ -135,7 +149,11 @@ const handleListItemOperation = async () => {
 	}
 };
 
-const deleteListItem = (record: ListItem) => {
+const deleteListItem = (record: unknown) => {
+	if (!isListItem(record)) {
+		return;
+	}
+
 	Modal.confirm({
 		title: "确认删除元素",
 		content: "确定要删除此元素吗？",

@@ -17,6 +17,7 @@ import AddKeyModal from "@/module/AddKeyModal/AddKeyModal.vue";
 import ExportData from "@/module/ExportData/ExportData.vue";
 import ImportData from "@/module/ImportData/ImportData.vue";
 import { message } from "ant-design-vue";
+import type { TreeProps } from "ant-design-vue";
 import IconButton from "@/components/IconButton/index.vue";
 import { getTypeColor } from '@/utils/format'
 
@@ -291,8 +292,8 @@ function buildKeyTree(keys: KeyItem[], separator: string | null = ":"): TreeNode
 	return root.children || [];
 }
 
-const selectKey = async (_selectedKeys: string[], info: { node: any }) => {
-	const rawNode: TreeNode | undefined = info.node?.rawNode || info.node;
+const selectKey: TreeProps['onSelect'] = (_selectedKeys, info) => {
+	const rawNode: TreeNode | undefined = (info.node as any)?.rawNode || info.node;
 
 	if (rawNode?.value?.key) {
 		connectionStore.setCurrentKey(rawNode.value.key);

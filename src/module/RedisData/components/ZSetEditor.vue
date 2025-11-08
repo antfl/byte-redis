@@ -77,6 +77,16 @@ const zsetItemModalVisible = ref(false);
 const zsetItemModalTitle = ref("添加元素");
 const zsetItem = reactive({ score: 0, value: "", originalValue: "" });
 
+const isZSetItem = (record: unknown): record is ZSetItem => {
+	if (!record || typeof record !== "object") {
+		return false;
+	}
+
+	const candidate = record as Partial<ZSetItem>;
+
+	return typeof candidate.score === "number" && typeof candidate.value === "string";
+};
+
 const showAddZSetItemModal = () => {
 	zsetItem.score = 0;
 	zsetItem.value = "";
@@ -85,7 +95,11 @@ const showAddZSetItemModal = () => {
 	zsetItemModalVisible.value = true;
 };
 
-const editZSetItem = (record: ZSetItem) => {
+const editZSetItem = (record: unknown) => {
+	if (!isZSetItem(record)) {
+		return;
+	}
+
 	zsetItem.score = record.score;
 	zsetItem.value = record.value;
 	zsetItem.originalValue = record.value;

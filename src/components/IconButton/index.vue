@@ -1,15 +1,16 @@
 <script setup lang="ts">
+import type { TooltipPlacement } from 'ant-design-vue/es/tooltip/abstractTooltipProps';
 
-const iconButtonProps = defineProps({
-  tooltip: {
-    type: [String, Number],
-    default: null,
+const iconButtonProps = withDefaults(
+  defineProps<{
+    tooltip?: string | number | null;
+    placement?: TooltipPlacement;
+  }>(),
+  {
+    tooltip: null,
+    placement: 'right',
   },
-  placement: {
-    type: String,
-    default: 'right',
-  }
-});
+);
 </script>
 
 <template>
