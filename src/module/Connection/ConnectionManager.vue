@@ -27,6 +27,7 @@ const newConnection = () => {
 				port: data.port,
 				username: data.username ? data.username : null,
 				password: data.password ? data.password : null,
+				separator: data.separator || ":",
 				db: data.db ?? 0,
 			});
 			message.success("连接创建成功");
@@ -70,6 +71,7 @@ const handleEditConnection = () => {
 			port: target.port,
 			username: target.username ?? "",
 			password: target.password ?? "",
+			separator: target.separator ?? ":",
 			db: target.db ?? 0,
 		},
 		onSuccess: (data: ConnectionFormState) => {
@@ -79,6 +81,7 @@ const handleEditConnection = () => {
 				port: data.port,
 				username: data.username ? data.username : null,
 				password: data.password ? data.password : null,
+				separator: data.separator || ":",
 				db: data.db ?? 0,
 			});
 			message.success("连接已更新");

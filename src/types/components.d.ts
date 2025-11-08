@@ -32,6 +32,7 @@ declare module 'vue' {
     AMenu: typeof import('ant-design-vue/es')['Menu']
     AMenuItem: typeof import('ant-design-vue/es')['MenuItem']
     AModal: typeof import('ant-design-vue/es')['Modal']
+    ApartmentOutlined: typeof import('@ant-design/icons-vue')['ApartmentOutlined']
     APopover: typeof import('ant-design-vue/es')['Popover']
     ARadio: typeof import('ant-design-vue/es')['Radio']
     ARadioGroup: typeof import('ant-design-vue/es')['RadioGroup']
@@ -55,6 +56,7 @@ declare module 'vue' {
     DownOutlined: typeof import('@ant-design/icons-vue')['DownOutlined']
     IconButton: typeof import('./../components/IconButton/index.vue')['default']
     MenuItem: typeof import('./../components/MeuTabs/MenuItem.vue')['default']
+    MenuOutlined: typeof import('@ant-design/icons-vue')['MenuOutlined']
     MeuTabs: typeof import('./../components/MeuTabs/index.vue')['default']
     PlusOutlined: typeof import('@ant-design/icons-vue')['PlusOutlined']
     ReloadOutlined: typeof import('@ant-design/icons-vue')['ReloadOutlined']
@@ -65,6 +67,7 @@ declare module 'vue' {
     SwapOutlined: typeof import('@ant-design/icons-vue')['SwapOutlined']
     SwapRightOutlined: typeof import('@ant-design/icons-vue')['SwapRightOutlined']
     SwitcherOutlined: typeof import('@ant-design/icons-vue')['SwitcherOutlined']
+    UnorderedListOutlined: typeof import('@ant-design/icons-vue')['UnorderedListOutlined']
     VerticalAlignBottomOutlined: typeof import('@ant-design/icons-vue')['VerticalAlignBottomOutlined']
     VerticalAlignTopOutlined: typeof import('@ant-design/icons-vue')['VerticalAlignTopOutlined']
   }

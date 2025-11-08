@@ -43,6 +43,7 @@ interface ConnectionConfig {
 	username?: string;
 	password?: string;
 	port: number;
+	separator?: string;
 }
 
 interface AddKeyFormData {
@@ -62,6 +63,9 @@ const { activeConnectionId, currentDbIndex, activeConnection, keyListRefreshTrig
 const filterText = ref("");
 const isLoading = ref(true);
 const fullTreeData = ref<TreeNode[]>([]);
+const rawKeys = ref<KeyItem[]>([]);
+const useSeparator = ref(true);
+const currentSeparator = computed(() => activeConnection.value?.separator || ":");
 
 const genData = computed(() => {
 	if (!filterText.value) return fullTreeData.value;
@@ -99,6 +103,7 @@ watch(
 			activeConnection.value &&
 			activeConnectionId.value
 		) {
+			useSeparator.value = true;
 			nextTick(() => {
 				init(activeConnection.value as ConnectionConfig);
 			});
@@ -163,12 +168,15 @@ const init = async (config: ConnectionConfig, skipConnect = false) => {
 		const keysRes = await getKeys(config.id, "*");
 		if (!keysRes.success || !keysRes.data) {
 			connectionStore.setCurrentKeyCount(0);
+			rawKeys.value = [];
+			fullTreeData.value = [];
 			message.error(keysRes.message || "获取键列表失败");
 			return;
 		}
 
 		connectionStore.setCurrentKeyCount(keysRes.data.total ?? keysRes.data.keys.length ?? 0);
-		fullTreeData.value = buildKeyTree(keysRes.data.keys, ":");
+		rawKeys.value = keysRes.data.keys ?? [];
+		applyKeyTree();
 		setTreeHeight();
 	} catch (error) {
 		console.error("初始化失败:", error);
@@ -178,15 +186,43 @@ const init = async (config: ConnectionConfig, skipConnect = false) => {
 	}
 };
 
-function buildKeyTree(keys: KeyItem[], separator = ":"): TreeNode[] {
+const applyKeyTree = () => {
+	fullTreeData.value = buildKeyTree(rawKeys.value, useSeparator.value ? currentSeparator.value : null);
+};
+
+watch([useSeparator, currentSeparator], () => {
+	if (!rawKeys.value.length) {
+		fullTreeData.value = [];
+		return;
+	}
+	applyKeyTree();
+});
+
+function buildKeyTree(keys: KeyItem[], separator: string | null = ":"): TreeNode[] {
 	const root: TreeNode = {
 		key: "root",
-		title: "根节点",
+		title: "ROOT",
 		children: [],
 		isLeaf: false,
 	};
 
 	const keyMap: Record<string, TreeNode> = {};
+	const shouldSplit = !!separator;
+
+	if (!shouldSplit) {
+		const flatNodes = keys.map((item) => ({
+			key: item.key,
+			title: item.key,
+			children: undefined,
+			isLeaf: true,
+			value: item,
+			root: true,
+		}));
+
+		flatNodes.sort((a, b) => a.title.localeCompare(b.title));
+
+		return flatNodes;
+	}
 
 	keys.forEach((item) => {
 		const parts = item.key.split(separator);
@@ -245,8 +281,12 @@ function buildKeyTree(keys: KeyItem[], separator = ":"): TreeNode[] {
 	return root.children || [];
 }
 
-const selectKey = async (selectedKeys: string[]) => {
-	connectionStore.setCurrentKey(selectedKeys[0] ?? null);
+const selectKey = async (_selectedKeys: string[], info: { node: TreeNode }) => {
+	if (info.node.isLeaf && info.node.value) {
+		connectionStore.setCurrentKey(info.node.value.key);
+	} else {
+		connectionStore.setCurrentKey(null);
+	}
 };
 
 const AddKeyModalRef = ref();
@@ -353,11 +393,16 @@ const showImportModal = () => {
             <SearchOutlined/>
           </template>
           <template #suffix>
+
             <IconButton placement="bottom" tooltip="新增" class="size-24px! mr-0!" @click="showAddKeyModal">
               <PlusOutlined class="font-size-16px"/>
             </IconButton>
-            <IconButton placement="bottom" tooltip="刷新" class="size-24px! mr-4px" @click="loadKeys">
+            <IconButton placement="bottom" tooltip="刷新" class="size-24px! mr-0px!" @click="loadKeys">
               <ReloadOutlined />
+            </IconButton>
+            <IconButton class="mr-4px" @click.stop="useSeparator = !useSeparator">
+              <ApartmentOutlined v-if="useSeparator"/>
+              <MenuOutlined v-else/>
             </IconButton>
           </template>
         </a-input>

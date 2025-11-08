@@ -11,6 +11,7 @@ export interface ConnectionFormState {
   port: number;
   username: string;
   password: string;
+  separator: string;
   db: number;
 }
 
@@ -32,6 +33,7 @@ const defaultFormState: ConnectionFormState = {
   port: 6379,
   username: "",
   password: "",
+  separator: ":",
   db: 0,
 };
 
@@ -52,6 +54,10 @@ const handleSubmit = async () => {
   if (!formState.value.name || !formState.value.host) {
     message.warning("请填写连接名称和主机地址");
     return;
+  }
+
+  if (!formState.value.separator) {
+    formState.value.separator = ":";
   }
 
   if (callback) {
@@ -113,6 +119,9 @@ defineExpose({ open });
       </a-form-item>
       <a-form-item label="密码" name="password">
         <a-input-password v-model:value="formState.password" placeholder="密码"/>
+      </a-form-item>
+      <a-form-item label="分隔符" name="separator">
+        <a-input v-model:value="formState.separator" placeholder=":（默认）"/>
       </a-form-item>
       <div class="flex gap-10px justify-end">
         <a-button class="py-2px! h-auto" type="primary" @click="handleSubmit">提交</a-button>

@@ -10,6 +10,7 @@ export interface Connection {
 	username?: string | null;
 	password?: string | null;
 	db?: number | null;
+	separator?: string | null;
 }
 
 export const useConnectionStore = defineStore("connection", () => {
@@ -36,6 +37,7 @@ export const useConnectionStore = defineStore("connection", () => {
 	const createConnection = (data: Omit<Connection, "id">): void => {
 		const newConnection: Connection = {
 			...data,
+			separator: data.separator ?? ":",
 			id: generateUniqueId(),
 		};
 
@@ -53,6 +55,7 @@ export const useConnectionStore = defineStore("connection", () => {
 			connections.value[index] = {
 				...connections.value[index],
 				...data,
+				separator: data.separator ?? connections.value[index].separator ?? ":",
 			};
 			trigger.value++;
 			saveToLocalStorage();
@@ -140,7 +143,10 @@ export const useConnectionStore = defineStore("connection", () => {
 			try {
 				const parsedData = JSON.parse(savedData);
 				if (parsedData.connections) {
-					connections.value = parsedData.connections;
+					connections.value = parsedData.connections.map((connection: Connection) => ({
+						...connection,
+						separator: connection.separator ?? ":",
+					}));
 				}
 				if (parsedData.activeConnectionId) {
 					activeConnectionId.value = parsedData.activeConnectionId;
