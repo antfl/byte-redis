@@ -13,7 +13,7 @@ const route = useRoute();
       <TitleBar/>
     </a-layout-header>
     <a-layout class="h-[calc(100vh_-_var(--title-bar-height)_-_var(--view-footer-height))] overflow-hidden">
-      <a-layout-sider v-if="route.path === '/data'" theme="light" width="300">
+      <a-layout-sider theme="light" width="300">
         <div class="flex h-full overflow-hidden">
           <RedisKeys/>
         </div>
