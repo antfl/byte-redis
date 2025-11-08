@@ -18,6 +18,7 @@ import ExportData from "@/module/ExportData/ExportData.vue";
 import ImportData from "@/module/ImportData/ImportData.vue";
 import { message } from "ant-design-vue";
 import IconButton from "@/components/IconButton/index.vue";
+import { getTypeColor } from '@/utils/format'
 
 interface KeyItem {
 	key: string;
@@ -306,17 +307,6 @@ const showAddKeyModal = () => {
 			}
 		},
 	});
-};
-
-const getTypeColor = (type: string) => {
-	const colors: Record<string, string> = {
-		string: "#1677ff",
-		hash: "green",
-		list: "orange",
-		set: "purple",
-		zset: "red",
-	};
-	return colors[type] || "gray";
 };
 
 const RedisKeyTreeRef = ref<HTMLElement>();

@@ -2,6 +2,7 @@
 import { ref, reactive, watch } from 'vue';
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons-vue';
 import { message } from "ant-design-vue";
+import { getTypeColor } from '@/utils/format'
 
 export type KeyType = "string" | "hash" | "list" | "set" | "zset";
 
@@ -203,7 +204,13 @@ defineExpose({ open });
           </a-form-item>
         </a-col>
         <a-col :span="12">
-          <a-form-item label="类型" required>
+          <a-form-item required>
+            <template #label>
+              <span>类型</span>
+              <a-tag class="ml-8px font-700" :color="getTypeColor(formData.type)" :bordered="false">
+                {{ formData.type.toUpperCase() }}
+              </a-tag>
+            </template>
             <a-select
               v-model:value="formData.type"
               :disabled="loading"

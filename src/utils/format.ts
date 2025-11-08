@@ -17,3 +17,18 @@ export const formatTTL = (seconds: number) => {
 
 	return result;
 };
+
+/**
+ * 格式化 Key 颜色
+ * @param type
+ */
+export const getTypeColor = (type: string) => {
+  const colors: Record<string, string> = {
+    string: "blue",
+    hash: "green",
+    list: "orange",
+    set: "purple",
+    zset: "red",
+  };
+  return colors[type] || "gray";
+};

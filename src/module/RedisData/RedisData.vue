@@ -98,6 +98,7 @@ import ListEditor from "./components/ListEditor.vue";
 import SetEditor from "./components/SetEditor.vue";
 import ZSetEditor from "./components/ZSetEditor.vue";
 import { EditOutlined, DeleteOutlined, FieldTimeOutlined, SwitcherOutlined } from "@ant-design/icons-vue";
+import { getTypeColor } from '@/utils/format'
 
 interface RedisKey {
 	key: string;
@@ -144,17 +145,6 @@ const loadKeyDetail = async () => {
 };
 
 watch(() => connectionStore.currentKey, loadKeyDetail, { immediate: true });
-
-const getTypeColor = (type: string) => {
-	const colors: Record<string, string> = {
-		string: "blue",
-		hash: "green",
-		list: "orange",
-		set: "purple",
-		zset: "red",
-	};
-	return colors[type] || "gray";
-};
 
 const copyKey = () => {
 	const { copy } = useClipboard();
@@ -203,7 +193,7 @@ const handleRenameKey = async () => {
 			message.error("未选择连接");
 			return;
 		}
-		
+
 		const res = await renameKey(
 			connectionStore.activeConnection.id,
 			keyData.key,
@@ -233,7 +223,7 @@ const handleUpdateTTL = async () => {
 			message.error("未选择连接");
 			return;
 		}
-		
+
 		const res = await setKeyTtl(
 			connectionStore.activeConnection.id,
 			keyData.key,
@@ -258,7 +248,7 @@ const handleDeleteKey = async () => {
 			message.error("未选择连接");
 			return;
 		}
-		
+
 		const res = await deleteKey(
 			connectionStore.activeConnection.id,
 			keyData.key,
