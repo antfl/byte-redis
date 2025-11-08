@@ -4,8 +4,8 @@ import { message } from "ant-design-vue";
 import type { FormInstance } from "ant-design-vue";
 
 // 定义表单状态类型
-interface ConnectionFormState {
-  id: number | null;
+export interface ConnectionFormState {
+  id: string | null;
   name: string;
   host: string;
   port: number;
@@ -25,7 +25,7 @@ const visible = ref(false);
 const modalTitle = ref("");
 
 // 初始化表单状态
-const formState = ref<ConnectionFormState>({
+const defaultFormState: ConnectionFormState = {
   id: null,
   name: "",
   host: "127.0.0.1",
@@ -33,7 +33,9 @@ const formState = ref<ConnectionFormState>({
   username: "",
   password: "",
   db: 0,
-});
+};
+
+const formState = ref<ConnectionFormState>({ ...defaultFormState });
 
 // 表单引用
 const formRef = ref<FormInstance>();
@@ -41,6 +43,7 @@ const formRef = ref<FormInstance>();
 // 关闭模态框
 const handleCancel = () => {
   formRef.value?.resetFields();
+  formState.value = { ...defaultFormState };
   visible.value = false;
 };
 
@@ -71,9 +74,11 @@ const open = (params?: OpenParams) => {
   // 合并表单数据
   if (params?.formData) {
     formState.value = {
-      ...formState.value,
+      ...defaultFormState,
       ...params.formData,
     };
+  } else {
+    formState.value = { ...defaultFormState };
   }
 
   visible.value = true;
